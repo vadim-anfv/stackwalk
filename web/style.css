@@ -649,7 +649,7 @@ textarea.src-input { display: block; resize: none; overflow: hidden; overflow-wr
   main.explore .left, main.explore .center { display: contents; }
   main.explore .src-col { grid-area: src; align-self: start; box-sizing: border-box; display: flex; flex-direction: column; gap: 12px; }
   /* as tall as the script, up to the window bottom, then it scrolls */
-  main.explore .left .grow { grid-area: script; align-self: start; max-height: calc(100% - var(--pad)); margin: 0 0 var(--pad) var(--pad); box-sizing: border-box; }
+  main.explore .left .grow { grid-area: script; align-self: stretch; max-height: calc(100% - var(--pad)); margin: 0 0 var(--pad) var(--pad); box-sizing: border-box; }
   main.explore .explain { grid-area: explain; margin: 0 var(--pad); }
   /* the player is the run frame's top row: it steps what is below it */
   main.explore .stepbar { grid-area: player; margin: var(--pad) var(--pad) 0; padding: 0; border: 0; }
