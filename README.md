@@ -8,7 +8,7 @@ Live at [vadim.rs/stackwalk](https://vadim.rs/stackwalk) (soon).
 
 ## Run
 
-Rust 1.88 or newer.
+Needs stable Rust.
 
 ```sh
 cd server
