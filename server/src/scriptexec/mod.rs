@@ -74,7 +74,7 @@ const MAX_PUBKEYS_PER_MULTISIG: i64 = 20;
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Options {
     /// Require data pushes be minimally encoded.
-    pub require_minimal: bool, //TODO(stevenroose) double check all fRequireMinimal usage in Core
+    pub require_minimal: bool,
     /// Verify OP_CHECKLOCKTIMEVERIFY.
     pub verify_cltv: bool,
     /// Verify OP_CHECKSEQUENCEVERIFY.

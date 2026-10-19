@@ -124,6 +124,32 @@ fn csv_reads_the_tx_version_unsigned() {
     assert_eq!(csv(-1, 10, 5), None);
 }
 
+/// `<operand> CHECKLOCKTIMEVERIFY` in a tx with `lock_time` whose input has `sequence`.
+fn cltv(lock_time: u32, sequence: u32, operand: i64) -> Option<ExecError> {
+    let mut tmpl = tx(TxOut::NULL);
+    tmpl.tx.lock_time = bitcoin::absolute::LockTime::from_consensus(lock_time);
+    tmpl.tx.input[0].sequence = bitcoin::Sequence(sequence);
+    let script = ScriptBuf::builder().push_int(operand).push_opcode(OP_CLTV).into_script().into_bytes();
+    run(ExecCtx::Legacy, tmpl, script, vec![]).error
+}
+
+#[test]
+fn cltv_compares_like_core() {
+    const T: u32 = 500_000_000;
+    let unsat = Some(ExecError::UnsatisfiedLocktime);
+    assert_eq!(cltv(100, 0, 100), None);
+    assert_eq!(cltv(100, 0, 101), unsat);
+    assert_eq!(cltv(T + 10, 0, i64::from(T)), None);
+    // heights and times do not compare
+    assert_eq!(cltv(100, 0, i64::from(T)), unsat);
+    assert_eq!(cltv(T, 0, 100), unsat);
+    // a final input disables nLockTime, so CLTV fails
+    assert_eq!(cltv(100, u32::MAX, 100), unsat);
+    // 5-byte operands are fine but past the u32 lock time
+    assert_eq!(cltv(u32::MAX, 0, 1 << 32), unsat);
+    assert_eq!(cltv(100, 0, -1), Some(ExecError::NegativeLocktime));
+}
+
 #[test]
 fn pick_and_roll_need_two_elements_before_reading_n() {
     // Core checks the depth first: a lone 5-byte n is a stack error, not a number error
