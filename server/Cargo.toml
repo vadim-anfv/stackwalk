@@ -3,7 +3,6 @@ name = "stackwalk-server"
 version = "0.1.0"
 edition = "2024"
 license = "MIT OR Apache-2.0"
-# a site, not a crate: never to crates.io
 publish = false
 
 [dependencies]
