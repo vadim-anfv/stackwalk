@@ -65,7 +65,7 @@ const BLOCKED = {
     // real keys in the input are built as test keys too: say which, not "A, B…"
     html: (sc) =>
       (sc.keys?.length
-        ? `We can't sign for real keys, so ${sc.keys.map((k) => `${esc(shortKey(k.key))} runs as test key ${esc(k.name)}`).join(', ')}: the script bytes and signatures are not the real ones.`
+        ? `We can't sign for real keys or know the preimages of real hashes, so ${sc.keys.map((k) => `${esc(shortKey(k.key))} runs as ${esc(k.name)}`).join(', ')}: the script bytes and signatures are not the real ones.`
         : 'This example uses named test keys (A, B…): fixed keys derived from their names, so the signatures are real but anyone can make them. Fine for learning, not a descriptor for real funds.') +
       ' <button id="keys-on">turn on test keys <kbd>K</kbd></button>',
   },

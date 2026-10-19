@@ -222,9 +222,10 @@ pub struct Scenario {
     pub wrap: &'static str,
     /// miniscript in bare / sh other than pk() / multi(): BIP-379 specifies it for wsh and tr only
     pub outside_bip379: bool,
-    /// Real keys of the input (hex pubkeys, xpubs with origin / path), each built as the
-    /// test key `name`, a free one: we cannot sign for them. `policy`, `miniscript` and
-    /// `descriptor` show the real keys again; script, tree, items and path names use `name`.
+    /// Real keys (hex pubkeys, xpubs with origin / path) and real hashes of the input, each
+    /// built as the free test name `name` (A.. for keys, H1.. for hashes): we cannot sign for
+    /// those keys or know those preimages. `policy`, `miniscript` and `descriptor` show the
+    /// real ones again; script, tree, items and path names use `name`.
     pub keys: Vec<KeyAlias>,
     /// the scriptPubKey as text with labels, e.g. `OP_0 <sha256(witnessScript)>`
     pub spk: String,

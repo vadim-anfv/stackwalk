@@ -1,7 +1,7 @@
-//! Real keys (hex pubkeys, xpubs with origin / path) in policy, miniscript or
-//! descriptor text. We cannot sign for them, so each one is swapped for a free
-//! test key name (A, B, ...) before building, and swapped back in the texts
-//! shown to the user.
+//! Real keys (hex pubkeys, xpubs with origin / path) and real hashes in policy, miniscript or
+//! descriptor text. We cannot sign for those keys or know those preimages, so each one is
+//! swapped for a free test name (A, B, ... for keys, H1, H2, ... for hashes) before building,
+//! and swapped back in the texts shown to the user.
 use std::collections::BTreeSet;
 use std::str::FromStr;
 
@@ -20,7 +20,15 @@ pub fn has_private_key(text: &str) -> bool {
 /// Fragments whose arguments are keys (multi's first argument is a number and never parses as one).
 const KEY_FNS: &[&str] = &["pk", "pkh", "pk_k", "pk_h", "multi", "sortedmulti", "multi_a", "sortedmulti_a", "wpkh", "tr"];
 
-/// (test key name, real key) pairs, in order of first appearance.
+/// Hash fragments and the hex length of a real hash in them.
+const HASH_FNS: &[(&str, usize)] = &[("sha256", 64), ("hash256", 64), ("ripemd160", 40), ("hash160", 40)];
+
+/// A real hash: hex of the fragment's length. Anything else is a preimage name.
+fn real_hash(tok: &str, parent: &str) -> bool {
+    HASH_FNS.iter().any(|(f, len)| *f == parent && tok.len() == *len && tok.chars().all(|c| c.is_ascii_hexdigit()))
+}
+
+/// (test name, real key or hash) pairs, in order of first appearance.
 pub type Aliases = Vec<(String, String)>;
 
 /// Rewrite every argument token of `text`: `f(token, enclosing fragment)` returns the replacement, if any.
@@ -82,7 +90,7 @@ pub fn short(k: &str) -> String {
     format!("{}…{}", chars[..10].iter().collect::<String>(), chars[chars.len() - 6..].iter().collect::<String>())
 }
 
-/// Swap real keys for free test key names.
+/// Swap real keys and hashes for free test names.
 pub fn alias(text: &str) -> Result<(String, Aliases), String> {
     // every name already in the text (test keys, hash names) is taken
     let mut used = BTreeSet::new();
@@ -92,19 +100,23 @@ pub fn alias(text: &str) -> Result<(String, Aliases), String> {
     });
     let mut aliases: Aliases = Vec::new();
     let mut free = ('A'..='Z').map(String::from).chain((1..).map(|i| format!("K{i}"))).filter(|n| !used.contains(n));
+    let mut free_hash = (1..).map(|i| format!("H{i}")).filter(|n| !used.contains(n));
     let mut err = None;
     let out = map_args(text, |tok, parent| {
-        match real_key(tok, parent)? {
-            Ok(()) => {}
-            Err(e) => {
-                err.get_or_insert(e);
-                return None;
+        let hash = real_hash(tok, parent);
+        if !hash {
+            match real_key(tok, parent)? {
+                Ok(()) => {}
+                Err(e) => {
+                    err.get_or_insert(e);
+                    return None;
+                }
             }
         }
         if let Some((name, _)) = aliases.iter().find(|(_, k)| k == tok) {
             return Some(name.clone());
         }
-        let name = free.next().expect("endless names");
+        let name = if hash { free_hash.next() } else { free.next() }.expect("endless names");
         aliases.push((name.clone(), tok.to_string()));
         Some(name)
     });
@@ -114,13 +126,13 @@ pub fn alias(text: &str) -> Result<(String, Aliases), String> {
     }
 }
 
-/// Put the real keys back into a text built from the aliased one.
+/// Put the real keys and hashes back into a text built from the aliased one.
 pub fn restore(text: &str, aliases: &Aliases) -> String {
     if aliases.is_empty() {
         return text.to_string();
     }
     map_args(text, |tok, parent| {
-        if !KEY_FNS.contains(&parent) {
+        if !KEY_FNS.contains(&parent) && !HASH_FNS.iter().any(|(f, _)| *f == parent) {
             return None;
         }
         aliases.iter().find(|(n, _)| n == tok).map(|(_, k)| k.clone())
@@ -145,11 +157,14 @@ mod tests {
     }
 
     #[test]
-    fn same_key_same_name_and_hashes_untouched() {
+    fn same_key_same_name_and_real_hashes_named_too() {
+        // a real hash gets a hash name (we don't know its preimage); a key named H stays a name
         let h = "a".repeat(64);
-        let (out, al) = alias(&format!("and_v(v:pk({HEX}),and_v(v:sha256({h}),multi(1,{HEX},H)))")).unwrap();
-        assert_eq!(out, format!("and_v(v:pk(A),and_v(v:sha256({h}),multi(1,A,H)))"));
-        assert_eq!(al.len(), 1);
+        let text = format!("and_v(v:pk({HEX}),and_v(v:sha256({h}),multi(1,{HEX},H)))");
+        let (out, al) = alias(&text).unwrap();
+        assert_eq!(out, "and_v(v:pk(A),and_v(v:sha256(H1),multi(1,A,H)))");
+        assert_eq!(al, vec![("A".to_string(), HEX.to_string()), ("H1".to_string(), h)]);
+        assert_eq!(restore(&out, &al), text);
     }
 
     #[test]

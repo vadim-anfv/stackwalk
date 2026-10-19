@@ -4,7 +4,7 @@ use std::str::FromStr;
 use miniscript::bitcoin::{PublicKey, ScriptBuf, Sequence, absolute};
 use miniscript::descriptor::{ShInner, WshInner, checksum};
 use miniscript::policy::Concrete;
-use miniscript::{BareCtx, Descriptor, DescriptorPublicKey, ForEachKey, Legacy, Miniscript, MiniscriptKey, ScriptContext, Segwitv0, Terminal};
+use miniscript::{BareCtx, Descriptor, DescriptorPublicKey, Legacy, Miniscript, MiniscriptKey, ScriptContext, Segwitv0, Terminal};
 
 use crate::keys::{KeyRing, NameTranslator};
 use crate::model::{self, CompileReq, Ins, KeyAlias, Kind, PathInfo, Scenario, Trace};
@@ -51,12 +51,12 @@ pub fn compile(req: &CompileReq) -> Result<Scenario, String> {
     let (aliased, aliases) = real_keys::alias(text)?;
     let mut sc = build(req, &aliased)?;
     check_size(&sc)?;
-    // a descriptor that does not parse back (non-standard bare miniscript) is no wallet's either
-    sc.importable = sc.descriptor.as_deref().and_then(|d| Descriptor::<String>::from_str(d).ok())
-        .is_some_and(|d| d.for_each_key(|k| aliases.iter().any(|(name, _)| name == k)));
     for s in [&mut sc.policy, &mut sc.miniscript, &mut sc.descriptor].into_iter().flatten() {
         *s = real_keys::restore(s, &aliases);
     }
+    // a wallet can import it only if it parses with real keys and hashes: a test name (A, H)
+    // does not, and neither does a non-standard bare miniscript
+    sc.importable = sc.descriptor.as_deref().is_some_and(|d| Descriptor::<DescriptorPublicKey>::from_str(d).is_ok());
     // the run used (compressed) test keys: a real uncompressed key would have passed it, in an
     // output no node relays a spend of
     if matches!(sc.wrap, "wsh" | "wpkh")

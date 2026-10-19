@@ -270,6 +270,27 @@ fn a_script_that_is_not_miniscript_says_why_its_stack_is_empty() {
 }
 
 #[test]
+fn a_real_hash_is_run_as_a_named_one_and_said_so() {
+    // a real sha256 was hashed again as if it were a preimage name, silently: the script did
+    // not match the descriptor, and `keys` said nothing was swapped
+    let h = "a".repeat(64);
+    let sc = ok("descriptor", &format!("wsh(sha256({h}))"), None);
+    assert_eq!(sc.descriptor.as_deref(), Some(format!("wsh(sha256({h}))").as_str()));
+    let alias = sc.keys.iter().find(|k| k.key == h).expect("the hash is listed as swapped");
+    assert!(sc.paths[0].name.contains(&alias.name), "{}", sc.paths[0].name);
+    assert!(sc.importable, "a real hash and no keys: a wallet can watch it");
+}
+
+#[test]
+fn importable_means_every_key_and_hash_is_real() {
+    assert!(!ok("descriptor", "wsh(sha256(H))", None).importable, "a hash name");
+    assert!(!ok("descriptor", &format!("wsh(and_v(v:pk({HEX}),sha256(H)))"), None).importable, "a real key next to a hash name");
+    assert!(ok("descriptor", &format!("wsh(and_v(v:pk({HEX}),sha256({})))", "b".repeat(64)), None).importable);
+    // no keys at all is a valid descriptor too
+    assert!(ok("descriptor", "wsh(older(1))", None).importable);
+}
+
+#[test]
 fn pick_and_roll_past_the_stack_fail_the_script_not_the_server() {
     // `1 1 PICK`: n is popped first, then one item is left, so index 1 is out of range (Core:
     // INVALID_STACK_OPERATION); checking before the pop let it through to an unwrap
