@@ -261,6 +261,27 @@ fn a_script_that_is_not_miniscript_says_why_its_stack_is_empty() {
     assert!(!sc.traces[0].steps[0].note.contains("not a miniscript"));
 }
 
+#[test]
+fn pick_and_roll_past_the_stack_fail_the_script_not_the_server() {
+    // `1 1 PICK`: n is popped first, then one item is left, so index 1 is out of range (Core:
+    // INVALID_STACK_OPERATION); checking before the pop let it through to an unwrap
+    for script in ["OP_1 OP_1 OP_PICK", "OP_1 OP_1 OP_ROLL"] {
+        let sc = ok("script", script, None);
+        let res = &sc.traces[0].result;
+        assert!(!res.ok && res.message.contains("stack"), "{script}: {}", res.message);
+    }
+    // in range they work: 2 1 0 PICK leaves 2 1 1
+    let sc = ok("script", "OP_2 OP_1 OP_0 OP_PICK OP_1 OP_EQUALVERIFY OP_DROP OP_2 OP_EQUAL", None);
+    assert!(sc.traces[0].result.ok, "{}", sc.traces[0].result.message);
+}
+
+#[test]
+fn a_bad_key_with_wide_characters_is_an_error_not_a_crash() {
+    // shortening the key for the message cut it inside a character
+    let err = run("policy", "pk([ééééééééééééééééééééé])", None).unwrap_err();
+    assert!(err.contains("invalid key"), "{err}");
+}
+
 const UNCOMPRESSED: &str = "0479be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798483ada7726a3c4655da4fbfc0e1108a8fd17b448a68554199c47d08ffb10d4b8";
 
 #[test]

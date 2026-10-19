@@ -394,8 +394,9 @@ impl Exec {
             None => return false,
         };
 
+        // as Core: only the type flag and the value count (a 5-byte operand can exceed u32)
         let lock_time =
-            match LockTime::from_consensus(u32::try_from(sequence).expect("sequence is u32")) {
+            match LockTime::from_consensus((sequence & 0x0040_ffff) as u32) {
                 Ok(lt) => lt,
                 Err(_) => return false,
             };

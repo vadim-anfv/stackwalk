@@ -74,7 +74,12 @@ fn real_key(tok: &str, parent: &str) -> Option<Result<(), String>> {
 }
 
 pub fn short(k: &str) -> String {
-    if k.chars().count() <= 20 { k.to_string() } else { format!("{}…{}", &k[..10], &k[k.len() - 6..]) }
+    let chars: Vec<char> = k.chars().collect();
+    if chars.len() <= 20 {
+        return k.to_string();
+    }
+    // by characters, not bytes: a key with wide characters must not be cut inside one
+    format!("{}…{}", chars[..10].iter().collect::<String>(), chars[chars.len() - 6..].iter().collect::<String>())
 }
 
 /// Swap real keys for free test key names.
