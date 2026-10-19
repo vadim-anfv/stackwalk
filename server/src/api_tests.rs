@@ -73,6 +73,16 @@ async fn compiles_wait_for_a_free_slot() {
     assert_eq!(status, StatusCode::SERVICE_UNAVAILABLE);
 }
 
+#[test]
+fn a_log_line_has_no_user_text() {
+    let req = |kind: &str, text: &str, wrap: Option<&str>| CompileReq { kind: kind.into(), text: text.into(), wrap: wrap.map(Into::into) };
+    let line = log_line(&req("policy", "pk(SECRET)", Some("sh")), StatusCode::OK, Duration::from_millis(12), Some(3));
+    assert_eq!(line, "compile kind=policy wrap=sh len=10 status=200 ms=12 paths=3");
+    // what the client sends as kind / wrap is not trusted: no new lines, no forged fields
+    let line = log_line(&req("policy\ncompile kind=fake", "x", Some("a b")), StatusCode::BAD_REQUEST, Duration::ZERO, None);
+    assert_eq!(line, "compile kind=other wrap=other len=1 status=400 ms=0");
+}
+
 #[tokio::test]
 async fn security_headers_are_set() {
     let app = secure(router(Limits::default()));

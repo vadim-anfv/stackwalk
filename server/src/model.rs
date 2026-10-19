@@ -1,7 +1,7 @@
 //! JSON shapes of the UI <-> backend contract (see API.md).
 use serde::{Deserialize, Serialize};
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Clone)]
 pub struct CompileReq {
     pub kind: String,
     pub text: String,

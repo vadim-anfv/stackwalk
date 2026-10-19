@@ -2,7 +2,7 @@
 //! them, from taking the server: input and body size, time per compile, compiles at once.
 //! Rate limiting per client is the reverse proxy's job (nginx `limit_req`).
 use std::sync::Arc;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use axum::Router;
 use axum::extract::rejection::JsonRejection;
@@ -50,11 +50,22 @@ fn error(status: StatusCode, msg: String) -> Response {
 async fn compile(State(api): State<Api>, req: Result<Json<CompileReq>, JsonRejection>) -> Response {
     let Json(req) = match req {
         Ok(r) => r,
-        Err(e) => return error(e.status(), format!("bad request: {}", e.body_text())),
+        Err(e) => {
+            println!("compile rejected status={}", e.status().as_u16());
+            return error(e.status(), format!("bad request: {}", e.body_text()));
+        }
     };
+    let start = Instant::now();
+    let (res, paths) = answer(api, req.clone()).await;
+    println!("{}", log_line(&req, res.status(), start.elapsed(), paths));
+    res
+}
+
+/// The response, and the number of spend paths when it compiled.
+async fn answer(api: Api, req: CompileReq) -> (Response, Option<usize>) {
     let max = api.limits.input;
     if req.text.len() > max {
-        return error(StatusCode::PAYLOAD_TOO_LARGE, format!("input too long: {} bytes (max {max})", req.text.len()));
+        return (error(StatusCode::PAYLOAD_TOO_LARGE, format!("input too long: {} bytes (max {max})", req.text.len())), None);
     }
     let run = async move {
         let slot = api.slots.acquire_owned().await.expect("the semaphore is never closed");
@@ -67,11 +78,31 @@ async fn compile(State(api): State<Api>, req: Result<Json<CompileReq>, JsonRejec
         .await
     };
     match tokio::time::timeout(api.limits.time, run).await {
-        Err(_) => error(StatusCode::SERVICE_UNAVAILABLE, "took too long or the server is busy: try again, or a smaller input".into()),
-        Ok(Ok(Ok(Ok(s)))) => Json(s).into_response(),
-        Ok(Ok(Ok(Err(e)))) => error(StatusCode::BAD_REQUEST, e),
-        Ok(_) => error(StatusCode::INTERNAL_SERVER_ERROR, "internal error (panic), see server log".into()),
+        Err(_) => (error(StatusCode::SERVICE_UNAVAILABLE, "took too long or the server is busy: try again, or a smaller input".into()), None),
+        Ok(Ok(Ok(Ok(s)))) => {
+            let paths = s.paths.len();
+            (Json(s).into_response(), Some(paths))
+        }
+        Ok(Ok(Ok(Err(e)))) => (error(StatusCode::BAD_REQUEST, e), None),
+        Ok(_) => (error(StatusCode::INTERNAL_SERVER_ERROR, "internal error (panic), see server log".into()), None),
     }
+}
+
+/// One line per compile, for the log: what kind of input, how big, how it went. Never the
+/// text itself or an error message (both can quote the input); kind and wrap come from the
+/// client, so only known values are written.
+fn log_line(req: &CompileReq, status: StatusCode, took: Duration, paths: Option<usize>) -> String {
+    let known = |v: Option<&str>, names: &[&'static str]| names.iter().find(|n| v == Some(**n)).copied().unwrap_or("other");
+    let kind = known(Some(&req.kind), &["policy", "miniscript", "descriptor", "script"]);
+    let wrap = match req.wrap.as_deref() {
+        None => "none",
+        w => known(w, &["bare", "pkh", "sh", "wpkh", "wsh", "tr"]),
+    };
+    let mut line = format!("compile kind={kind} wrap={wrap} len={} status={} ms={}", req.text.len(), status.as_u16(), took.as_millis());
+    if let Some(n) = paths {
+        line += &format!(" paths={n}");
+    }
+    line
 }
 
 async fn ping() -> Json<serde_json::Value> {
