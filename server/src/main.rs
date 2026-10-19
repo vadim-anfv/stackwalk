@@ -1,6 +1,7 @@
 // debug builds serve web/ from disk; the embedded page is for release (and the tests)
 #[cfg_attr(debug_assertions, allow(dead_code))]
 mod assets;
+mod api;
 mod keys;
 mod model;
 mod paths;
@@ -16,41 +17,12 @@ mod tree;
 #[cfg(debug_assertions)]
 use std::path::Path;
 
+#[cfg(debug_assertions)]
 use axum::Router;
-use axum::http::StatusCode;
-use axum::response::{IntoResponse, Json, Response};
-use axum::routing::{get, post};
-use serde_json::json;
 #[cfg(debug_assertions)]
 use tower_http::services::ServeDir;
 #[cfg(debug_assertions)]
 use tower_http::set_header::SetResponseHeaderLayer;
-
-use model::CompileReq;
-
-fn bad(msg: String) -> Response {
-    (StatusCode::BAD_REQUEST, Json(json!({ "error": msg }))).into_response()
-}
-
-async fn compile(body: String) -> Response {
-    let req: CompileReq = match serde_json::from_str(&body) {
-        Ok(r) => r,
-        Err(e) => return bad(format!("bad request: {e}")),
-    };
-    let res = tokio::task::spawn_blocking(move || {
-        std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| scenario::compile(&req)))
-    })
-    .await;
-    match res {
-        Ok(Ok(Ok(s))) => Json(s).into_response(),
-        Ok(Ok(Err(e))) => bad(e),
-        _ => bad("internal error (panic), see server log".into()),
-    }
-}
-
-async fn ping() -> Json<serde_json::Value> {
-    Json(json!({ "ok": true }))
-}
 
 /// Dev only: the browser reloads when a file under `dir` changes, and when the
 /// server comes back after a restart (bacon). No caching, so an edited module
@@ -76,7 +48,7 @@ fn dev_layers(app: Router, dir: &Path) -> (Router, notify::RecommendedWatcher) {
 
 #[tokio::main]
 async fn main() {
-    let app = Router::new().route("/api/compile", post(compile)).route("/api/ping", get(ping));
+    let app = api::router(api::Limits::default());
     // the page: web/ as is with live reload in debug builds, embedded in release
     #[cfg(debug_assertions)]
     let (app, _watcher, page) = {
@@ -85,7 +57,7 @@ async fn main() {
         (app, watcher, format!("from {} (live reload)", dir.display()))
     };
     #[cfg(not(debug_assertions))]
-    let (app, page) = (app.fallback(assets::serve), "embedded");
+    let (app, page) = (api::secure(app.fallback(assets::serve)), "embedded");
 
     // BIND: comma separated, e.g. 127.0.0.1:5173,192.168.1.10:5173 to open it from a phone
     let binds = std::env::var("BIND").unwrap_or_else(|_| "127.0.0.1:5173".into());

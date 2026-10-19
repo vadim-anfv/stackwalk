@@ -147,7 +147,15 @@ Templates: `pk` / `pkh` / `wpkh`: `A signs`, plus `B tries` (wrong signer). `mul
 
 ## Errors
 
-Status 400: `{ "error": "human readable message" }` (parse / compile errors, taproot, too many assets, etc.).
+Always `{ "error": "human readable message" }`, with the status:
+
+- 400: parse / compile errors, taproot, too many assets, a body that is not valid JSON, etc.
+- 413: the source `text` is over 4096 bytes, or the body over 16 KiB.
+- 415: the request is not `Content-Type: application/json`.
+- 503: the compile took over 5 s, or waited that long for a free slot (half the CPU cores compile at once).
+- 500: the compile panicked (a bug; see the server log).
+
+Limits per client (rate) are the reverse proxy's job. Release builds also send security headers on every response: a CSP that allows only the page's own scripts, styles, fonts and API, `nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy`.
 
 ## GET /api/ping
 

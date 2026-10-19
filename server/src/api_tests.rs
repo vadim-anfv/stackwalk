@@ -1,0 +1,84 @@
+use std::time::Duration;
+
+use axum::body::{Body, to_bytes};
+use axum::http::{Request, StatusCode, header};
+use tower::ServiceExt;
+
+use super::*;
+
+async fn post(limits: Limits, content_type: &str, body: String) -> (StatusCode, String) {
+    let req = Request::post("/api/compile").header(header::CONTENT_TYPE, content_type).body(Body::from(body)).unwrap();
+    let res = router(limits).oneshot(req).await.unwrap();
+    let status = res.status();
+    (status, String::from_utf8(to_bytes(res.into_body(), usize::MAX).await.unwrap().to_vec()).unwrap())
+}
+
+async fn compile_json(limits: Limits, text: &str) -> (StatusCode, String) {
+    post(limits, "application/json", serde_json::json!({ "kind": "policy", "text": text }).to_string()).await
+}
+
+#[tokio::test]
+async fn compiles_a_policy() {
+    let (status, body) = compile_json(Limits::default(), "pk(A)").await;
+    assert_eq!(status, StatusCode::OK, "{body}");
+    assert!(body.contains("\"descriptor\""));
+}
+
+#[tokio::test]
+async fn a_compile_error_is_json() {
+    let (status, body) = compile_json(Limits::default(), "pk(").await;
+    assert_eq!(status, StatusCode::BAD_REQUEST);
+    assert!(body.starts_with("{\"error\":"), "{body}");
+}
+
+#[tokio::test]
+async fn only_json_is_accepted() {
+    // a cross-site form can post text/plain without a CORS preflight
+    let (status, body) = post(Limits::default(), "text/plain", r#"{"kind":"policy","text":"pk(A)"}"#.into()).await;
+    assert_eq!(status, StatusCode::UNSUPPORTED_MEDIA_TYPE);
+    assert!(body.starts_with("{\"error\":"), "{body}");
+}
+
+#[tokio::test]
+async fn long_input_is_refused_before_compiling() {
+    let limits = Limits { input: 10, ..Limits::default() };
+    let (status, body) = compile_json(limits, "and(pk(A),pk(B))").await;
+    assert_eq!(status, StatusCode::PAYLOAD_TOO_LARGE);
+    assert!(body.contains("input too long"), "{body}");
+}
+
+#[tokio::test]
+async fn large_body_is_refused() {
+    let limits = Limits { body: 64, ..Limits::default() };
+    let (status, body) = compile_json(limits, &"x".repeat(100)).await;
+    assert_eq!(status, StatusCode::PAYLOAD_TOO_LARGE);
+    assert!(body.starts_with("{\"error\":"), "{body}");
+}
+
+#[tokio::test]
+async fn a_slow_compile_times_out() {
+    let limits = Limits { time: Duration::ZERO, ..Limits::default() };
+    let (status, body) = compile_json(limits, "pk(A)").await;
+    assert_eq!(status, StatusCode::SERVICE_UNAVAILABLE);
+    assert!(body.contains("too long"), "{body}");
+}
+
+#[tokio::test]
+async fn compiles_wait_for_a_free_slot() {
+    // no slots at all: the request waits, then times out instead of running
+    let limits = Limits { at_once: 0, time: Duration::from_millis(50), ..Limits::default() };
+    let (status, _) = compile_json(limits, "pk(A)").await;
+    assert_eq!(status, StatusCode::SERVICE_UNAVAILABLE);
+}
+
+#[tokio::test]
+async fn security_headers_are_set() {
+    let app = secure(router(Limits::default()));
+    let res = app.oneshot(Request::get("/api/ping").body(Body::empty()).unwrap()).await.unwrap();
+    let h = res.headers();
+    assert_eq!(h["x-content-type-options"], "nosniff");
+    assert_eq!(h["x-frame-options"], "DENY");
+    assert_eq!(h["referrer-policy"], "strict-origin-when-cross-origin");
+    let csp = h["content-security-policy"].to_str().unwrap();
+    assert!(csp.contains("script-src 'self'") && csp.contains("frame-ancestors 'none'"), "{csp}");
+}

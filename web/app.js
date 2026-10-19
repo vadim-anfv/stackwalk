@@ -167,7 +167,9 @@ function sourceText(sc, kind) {
 async function compile(body) {
   try {
     const r = await fetch('api/compile', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
-    if (r.status === 502 || r.status === 404 || r.status === 405) return { offline: true };
+    // the backend always answers JSON; anything else is the proxy (rate limit, backend down) or not us
+    if (!r.headers.get('content-type')?.includes('json'))
+      return r.status === 429 ? { error: 'too many requests: wait a few seconds' } : { offline: true };
     const data = await r.json();
     return r.ok ? { sc: data } : { error: data.error ?? `HTTP ${r.status}` };
   } catch {
@@ -178,7 +180,7 @@ async function compile(body) {
 // policy / miniscript have no spaces; Script tokens are space separated
 const cleanSource = (kind, text) => (kind === 'script' ? text.replace(/\s+/g, ' ').trim() : text.replace(/\s+/g, ''));
 
-const OFFLINE = '✗ backend is not running (cd server && bacon)';
+const OFFLINE = '✗ the backend is not reachable (locally: cd server && bacon)';
 
 // Fields flow one way: policy compiles to miniscript, miniscript is wrapped in the descriptor.
 // Typing a field fills the ones below it; the policy is never lifted back from a miniscript.
