@@ -129,7 +129,6 @@ header {
 .help-head button { border: none; background: none; font-size: 20px; line-height: 1; padding: 0 4px; color: var(--muted); }
 .help-cols { display: flex; flex-wrap: wrap; gap: 8px 36px; padding: 6px 18px 16px; }
 .help-cols section { flex: 1 1 300px; }
-.help-cols h3 { margin: 10px 0 6px; font-size: 13px; color: var(--accent); }
 .help-cols dl { display: grid; grid-template-columns: auto 1fr; gap: 6px 14px; margin: 0; font-size: 13px; }
 .help-cols dt { white-space: nowrap; }
 .help-cols dd { margin: 0; }
@@ -172,24 +171,8 @@ select {
 .toggles { display: flex; gap: 16px; margin-left: auto; }
 
 .hdr { display: flex; flex: 1; flex-wrap: wrap; align-items: center; gap: 12px 20px; }
-/* flag:train */
-body[data-view='explore'] .train-only,
-body[data-view='train'] .explore-only { display: none !important; }
-/* /flag:train */
-
-/* feature flags: see flags.js */
-/* flag:train */
-body:not(.ff-train) .flag-train,
-body:not(.ff-train) .views,
-body:not(.ff-leaderboard) .flag-leaderboard { display: none !important; }
-/* /flag:train */
-body:not(.ff-altStack) .flag-altStack { display: none !important; }
-body:not(.ff-predict) .flag-predict { display: none !important; }
-/* a view switch with one view left (the build cut the others) is no switch */
-.views:not(:has(> :nth-child(2))) { display: none; }
-
-/* alt stack column: feature flag + header toggle */
-body:not(.alt-on) .stackbox.flag-altStack { display: none !important; }
+/* alt stack column: the alt stack toggle */
+body:not(.alt-on) .stackbox.alt-only { display: none !important; }
 body.alt-on .stacks { grid-template-columns: minmax(0, 560px) minmax(0, 560px); }
 
 /* script refused: uses the alt stack or test keys while they are off */
@@ -198,8 +181,6 @@ body.blocked .timeline { display: none; }
 .op-title.err { color: var(--fail); }
 .op-title.start { color: var(--text); font-style: italic; }
 
-.views button { font-weight: 600; }
-.seg.small button { padding: 2px 8px; font-size: 12px; }
 
 
 /* layout */
@@ -381,7 +362,7 @@ textarea.src-input { display: block; resize: none; overflow: hidden; overflow-wr
 .op-title { font-size: 18px; font-weight: 700; color: var(--accent); }
 .desc { color: var(--muted); }
 .more { display: none; }
-.note, .err, .ask { margin-top: 4px; }
+.note, .err { margin-top: 4px; }
 .note { font-family: var(--mono); }
 .err { font-family: var(--mono); color: var(--fail); }
 
@@ -396,7 +377,6 @@ textarea.src-input { display: block; resize: none; overflow: hidden; overflow-wr
   border-left: 3px solid var(--kind);
 }
 .chipx.gone { opacity: 0.6; text-decoration: line-through; }
-.ask { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 
 /* stacks */
 
@@ -421,7 +401,6 @@ textarea.src-input { display: block; resize: none; overflow: hidden; overflow-wr
   background: var(--bg);
 }
 .stack { --gap: 5px; display: flex; flex-direction: column; gap: var(--gap); margin-top: auto; }
-.stack.veiled { opacity: 0.35; filter: blur(0.5px); }
 
 .empty-stack {
   color: var(--muted);
@@ -516,94 +495,6 @@ textarea.src-input { display: block; resize: none; overflow: hidden; overflow-wr
 /* start is the state before the run, not a step: dashed, neutral, set apart */
 .tick.start { border: 1px dashed var(--edge); margin-right: 6px; }
 .tick.start.current { border-color: var(--text); }
-
-/* flag:train */
-/* train */
-
-.train { grid-template-columns: minmax(0, 1fr) minmax(300px, 380px); align-items: start; }
-.t-main, .t-side { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
-
-.task-head { display: flex; justify-content: space-between; gap: 12px; }
-.t-ms { display: block; margin-top: 10px; font-size: 26px; font-weight: 700; color: var(--accent); overflow-wrap: anywhere; }
-#t-timer { font-family: var(--mono); }
-
-#t-input {
-  width: 100%;
-  resize: vertical;
-  font: 18px/1.5 var(--mono);
-  color: var(--text);
-  background: var(--bg);
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  padding: 10px 12px;
-}
-#t-input:focus { outline: none; border-color: var(--accent); }
-
-.suggest { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; min-height: 30px; margin: 8px 0 4px; }
-.sug { font-family: var(--mono); font-size: 12px; padding: 2px 8px; }
-.sug b { color: var(--accent); font-weight: 600; }
-.sug.on { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 14%, transparent); }
-.hint { font-size: 12px; margin-left: 4px; }
-
-.toks { display: flex; flex-wrap: wrap; gap: 5px; }
-.preview { min-height: 30px; padding: 6px 0; }
-.tok {
-  font-family: var(--mono);
-  font-size: 13px;
-  padding: 2px 7px;
-  border-radius: 5px;
-  border: 1px solid var(--line);
-  background: var(--bg);
-}
-.tok-push { color: var(--k-pubkey); }
-.tok-num { color: var(--k-num); }
-.tok-flow { color: var(--k-hash); }
-.tok-error { color: var(--fail); border-color: var(--fail); text-decoration: wavy underline; }
-.tok.good { color: var(--ok); border-color: color-mix(in srgb, var(--ok) 50%, transparent); }
-.tok.bad { color: var(--fail); border-color: var(--fail); }
-.tok.want { color: var(--accent); border-color: var(--accent); }
-.tok.missing { color: var(--muted); border-style: dashed; }
-
-.t-actions { display: flex; gap: 8px; margin-top: 8px; flex-wrap: wrap; }
-
-.t-result.ok { border-color: var(--ok); }
-.t-result.fail { border-color: var(--fail); }
-.verdict { font-weight: 600; margin-bottom: 10px; }
-.t-result.ok .verdict { color: var(--ok); }
-.t-result.fail .verdict { color: var(--fail); }
-.cmp { display: grid; grid-template-columns: 70px 1fr; gap: 8px; align-items: start; margin-top: 6px; }
-
-.stats { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; }
-.stat { display: flex; flex-direction: column; align-items: center; }
-.stat .v { font: 700 20px var(--mono); }
-.stat .k { font-size: 11px; }
-
-.board-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 10px; }
-.board-head h2 { margin: 0; }
-.board { width: 100%; border-collapse: collapse; font-size: 13px; }
-.board th { text-align: left; font-weight: 500; color: var(--muted); font-size: 11px; padding: 4px 6px; }
-.board td { padding: 5px 6px; border-top: 1px solid var(--line); font-family: var(--mono); }
-.board tr.you td { color: var(--accent); font-weight: 700; background: color-mix(in srgb, var(--accent) 10%, transparent); }
-
-.cheats { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 4px 12px; font-size: 12px; }
-.cheats div { display: flex; gap: 8px; align-items: baseline; min-width: 0; }
-.cheats kbd { flex: none; min-width: 44px; text-align: center; color: var(--accent); }
-.cheats span { min-width: 0; overflow-wrap: anywhere; color: var(--muted); font-family: var(--mono); font-size: 11px; }
-
-.palette { display: none; flex-wrap: wrap; gap: 5px; margin-bottom: 8px; }
-.palette button { font-family: var(--mono); font-size: 13px; padding: 6px 9px; }
-
-@media (max-width: 860px), (pointer: coarse) {
-  .palette { display: flex; }
-}
-
-@media (max-width: 860px) {
-  .train { grid-template-columns: 1fr; }
-  .t-ms { font-size: 20px; }
-  .stats { grid-template-columns: repeat(3, 1fr); row-gap: 10px; }
-  .cheats { grid-template-columns: 1fr; }
-}
-/* /flag:train */
 
 /* desktop explore: source | script | stack, the step card over script and
    stack. The listing and the stack are as tall as their content, up to the
@@ -715,7 +606,7 @@ textarea.src-input { display: block; resize: none; overflow: hidden; overflow-wr
   .theme { min-width: 0; }
   .theme-name { display: none; }
   /* no alt stack on phones (app.js): no toggle either */
-  .toggle.flag-altStack { display: none !important; }
+  .toggle.alt-only { display: none !important; }
   /* explore order: source, step card, then script | stack side by side;
      .left / .center dissolve into main's grid */
   .left, .center, .src-col { display: contents; }

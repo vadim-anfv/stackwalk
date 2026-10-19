@@ -1,10 +1,6 @@
 import { renderCost } from './cost.js';
 import { describe, opText } from './opinfo.js';
-import { applyFlags, FLAGS } from './flags.js';
-import { groups, scenarios as allScenarios } from './scenarios.js';
-// flag:train
-import { focusTrain, initTrain } from './train.js';
-// /flag:train
+import { groups, scenarios } from './scenarios.js';
 
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
@@ -27,8 +23,6 @@ const state = {
   scenario: 0,
   path: 0,
   step: 0,
-  predict: false,
-  revealed: new Set(),
   mode: loadPref('mode', 'miniscript'),
   source: 'policy', // which field the user typed into last: policy, miniscript or descriptor
   wrap: 'wsh', // output type policy / miniscript are built for (API.md); an example sets it
@@ -37,20 +31,12 @@ const state = {
   scriptView: loadPref('scriptView', 'grouped'), // desktop listing: 'grouped' by leaf fragment or 'ops', one per line
   testKeys: loadPref('testKeys', 'off') === 'on', // opt-in: named keys are not a real descriptor
   blocked: null, // why the script is refused: 'alt' | 'keys' | null
-  view: location.hash === '#explore' ? 'explore' : loadPref('view', 'explore'),
-  // flag:train
-  ...(location.hash === '#train' && { view: 'train' }),
-  // /flag:train
   live: null, // scenario from the backend (API.md); null = nothing compiled yet
 };
 let reqSeq = 0; // the latest backend request wins
 let trace;
-// flag:train
-let trainReady = false;
-// /flag:train
-let drawn = { step: -1, hide: false }; // last drawn stack: animate only a single step forward
+let drawn = -1; // last drawn stack: animate only a single step forward
 
-const scenarios = allScenarios.filter((s) => !s.flag || FLAGS[s.flag]);
 // drawn until the backend answered (or when it is not running): nothing to run
 const EMPTY = {
   policy: null,
@@ -67,11 +53,10 @@ const scenario = () => state.live ?? EMPTY;
 // backend items are JSON, so object identity means nothing: compare by id
 const key = (x) => x.id;
 const last = () => trace.steps.length - 1;
-const hidden = () => state.predict && state.step > 0 && !state.revealed.has(state.step);
 
 // phones have no room for a third column: no alt stack there at all
 const PHONE = matchMedia('(max-width: 860px)');
-const altOn = () => FLAGS.altStack && state.alt && !PHONE.matches;
+const altOn = () => state.alt && !PHONE.matches;
 const usesAlt = (sc) => sc.script.some((ins) => ins.op === 'OP_TOALTSTACK' || ins.op === 'OP_FROMALTSTACK');
 // key items (pk, sig, hash160 of a key) carry the key's name: A, B…
 const usesTestKeys = (sc) =>
@@ -127,8 +112,7 @@ function load() {
   document.body.classList.toggle('alt-on', altOn());
   document.body.classList.toggle('blocked', Boolean(state.blocked));
   state.step = 0;
-  state.revealed = new Set();
-  drawn = { step: -1, hide: false };
+  drawn = -1;
   renderStatic();
   renderCost(sc, state.blocked ? -1 : state.path);
   render();
@@ -290,7 +274,7 @@ function renderStatic() {
       label = groupLabel(key, label);
       const opts = scenarios
         .map((s, i) => [s, i])
-        .filter(([s]) => (s.group ?? 'miniscript') === key && !(s.flag === 'altStack' && PHONE.matches))
+        .filter(([s]) => (s.group ?? 'miniscript') === key && !(s.alt && PHONE.matches))
         .map(([s, i]) => `<option value="${i}" ${i === state.scenario ? 'selected' : ''}>${esc(s.name)}</option>`);
       return opts.length ? `<optgroup label="${esc(label)}">${opts.join('')}</optgroup>` : '';
     })
@@ -406,7 +390,6 @@ function itemHtml(x, cls = '') {
 function render() {
   const sc = scenario();
   const step = trace.steps[state.step];
-  const hide = hidden();
   const ins = step.pc >= 0 ? sc.script[step.pc] : null;
 
   // script lines: what already ran, what was skipped, where we are
@@ -440,15 +423,14 @@ function render() {
       ? describe(ins)
       : 'The spending data is placed on the stack, then the script runs op by op.';
   let note = '';
-  if (hide) note = `<div class="ask">What does the stack look like after <b>${esc(title)}</b>? <button id="reveal">reveal <kbd>Space</kbd></button></div>`;
-  else if (step.error) note = `<div class="err">✗ ${esc(step.error)}</div>`;
+  if (step.error) note = `<div class="err">✗ ${esc(step.error)}</div>`;
   else if (run) note = '<div class="note">The interpreter still reads them: they count toward the 201-op limit, and a disabled opcode (OP_CAT…) here would fail the script.</div>';
   else if (step.note) note = `<div class="note">${esc(step.note)}</div>`;
 
   // what this step took off the stack and put on it
   const chip = (x, cls) => `<span class="chipx k-${x.kind} ${cls}">${esc(x.label)}</span>`;
   const delta =
-    hide || state.step === 0 || (!step.popped.length && !step.pushed.length)
+    state.step === 0 || (!step.popped.length && !step.pushed.length)
       ? ''
       : `<div class="delta">${step.popped.length ? `<span class="k">popped</span>${step.popped.map((x) => chip(x, 'gone')).join('')}` : ''}${
           step.pushed.length ? `<span class="k">${step.popped.length ? '→ ' : ''}pushed</span>${step.pushed.map((x) => chip(x, 'new')).join('')}` : ''
@@ -461,14 +443,12 @@ function render() {
   const d = $('explain').querySelector('.desc');
   $('explain').classList.toggle('clamped', !$('explain').classList.contains('expanded') && d.scrollHeight > d.clientHeight + 1);
 
-  // stack, top first. One step forward (or revealing a predicted step) is
-  // animated: popped items leave first, then pushed ones drop in. Going back
-  // or jumping redraws at once.
-  const shown = hide ? trace.steps[state.step - 1] : step;
-  const fresh = new Set(hide ? [] : step.pushed.map(key));
-  const animate = !hide && state.step > 0 && (state.step === drawn.step + 1 || (state.step === drawn.step && drawn.hide));
-  drawn = { step: state.step, hide };
-  let items = shown.stack
+  // stack, top first. One step forward is animated: popped items leave first,
+  // then pushed ones drop in. Going back or jumping redraws at once.
+  const fresh = new Set(step.pushed.map(key));
+  const animate = state.step > 0 && state.step === drawn + 1;
+  drawn = state.step;
+  let items = step.stack
     .slice()
     .reverse()
     .map((x) => itemHtml(x, fresh.has(key(x)) ? `new${animate ? ' enter' : ''}${animate && step.popped.length ? ' after-pop' : ''}` : ''));
@@ -483,20 +463,18 @@ function render() {
     items = [...items.slice(0, step.pushed.length), ...ghosts, ...items.slice(step.pushed.length)];
   }
   $('stack').innerHTML = items.length ? items.join('') : '<div class="empty-stack">empty</div>';
-  $('stack').classList.toggle('veiled', hide);
 
   $('alt-toggle').checked = state.alt;
   $('keys-toggle').checked = state.testKeys;
   if (altOn()) {
-    const alt = shown.alt;
+    const alt = step.alt;
     $('alt').innerHTML = alt.length
       ? alt
           .slice()
           .reverse()
-          .map((x) => itemHtml(x, !hide && step.toAlt && key(x) === key(step.toAlt) ? `new${animate ? ' enter after-pop' : ''}` : ''))
+          .map((x) => itemHtml(x, step.toAlt && key(x) === key(step.toAlt) ? `new${animate ? ' enter after-pop' : ''}` : ''))
           .join('')
       : '<div class="empty-stack">empty</div>';
-    $('alt').classList.toggle('veiled', hide);
   }
 
   // footer
@@ -507,8 +485,7 @@ function render() {
   $('result').innerHTML = done ? `<span class="mark">${trace.result.ok ? '✓' : '✗'}</span><span class="msg"> ${esc(trace.result.message)}</span>` : '';
   for (const t of $('timeline').children) t.classList.toggle('current', Number(t.dataset.step) === state.step);
   $('first').disabled = $('prev').disabled = state.step === 0;
-  $('next').disabled = $('last').disabled = state.step === last() && !hide;
-  $('predict').checked = state.predict;
+  $('next').disabled = $('last').disabled = state.step === last();
   $('play').disabled = last() === 0;
 }
 
@@ -534,14 +511,7 @@ function go(i, auto = false) {
 }
 
 function next() {
-  if (hidden()) return reveal();
   go(state.step + 1);
-}
-
-function reveal() {
-  stopPlay();
-  state.revealed.add(state.step);
-  render();
 }
 
 // autoplay: one step per PLAY_MS, long enough for the pop / push animation
@@ -556,7 +526,6 @@ function stopPlay() {
 }
 
 function playTick() {
-  state.revealed.add(state.step + 1); // predict mode: autoplay shows every stack
   go(state.step + 1, true);
   if (state.step >= last()) return stopPlay();
   playTimer = setTimeout(playTick, PLAY_MS);
@@ -700,32 +669,6 @@ for (const id of Object.values(INPUTS)) {
   });
 }
 
-function setView(view) {
-  // a view needs its tab (a saved one may be gone from this build)
-  if (!$('view').querySelector(`[data-view="${view}"]`)) view = 'explore';
-  // flag:train
-  if (!FLAGS.train) view = 'explore';
-  // /flag:train
-  state.view = view;
-  savePref('view', view);
-  document.body.dataset.view = view;
-  for (const b of $('view').querySelectorAll('button')) b.classList.toggle('on', b.dataset.view === view);
-  // flag:train
-  if (view === 'train') {
-    if (!trainReady) initTrain();
-    trainReady = true;
-    focusTrain();
-    return;
-  }
-  // /flag:train
-  document.activeElement?.blur();
-}
-
-$('view').onclick = (e) => {
-  const b = e.target.closest('[data-view]');
-  if (b) setView(b.dataset.view);
-};
-
 // auto = follow the system; light / dark pin it (applied early by index.html)
 const THEMES = ['auto', 'light', 'dark'];
 const THEME_ICONS = { auto: '◐', light: '☀', dark: '☾' };
@@ -792,13 +735,7 @@ $('keys-toggle').onchange = (e) => {
   setTestKeys(e.target.checked);
 };
 
-$('predict').onchange = (e) => {
-  state.predict = e.target.checked;
-  render();
-};
-
 $('explain').onclick = (e) => {
-  if (e.target.closest('#reveal')) reveal();
   if (e.target.closest('#keys-on')) setTestKeys(true);
   if (e.target.closest('#alt-on')) setAlt(true);
   // phone: the opcode description is clamped to one line, a tap expands it
@@ -897,7 +834,6 @@ document.addEventListener(
       openHelp();
       return;
     }
-    if (state.view !== 'explore') return;
     const fn = STEP_KEYS[e.key] ?? KEYS[e.key];
     if (!fn) return;
     e.preventDefault();
@@ -910,15 +846,9 @@ document.addEventListener(
 const KEYS = {
   Home: () => go(0),
   End: () => go(last()),
-  ' ': () => (hidden() ? reveal() : next()),
-  p: () => {
-    if (!FLAGS.predict) return;
-    state.predict = !state.predict;
-    render();
-  },
+  ' ': next,
   k: () => setTestKeys(!state.testKeys),
-  // only when the feature flag shows the alt stack at all
-  a: () => FLAGS.altStack && setAlt(!state.alt),
+  a: () => setAlt(!state.alt),
   d: () => setMode('miniscript'), // the "descriptor" mode: policy -> miniscript -> descriptor
   s: () => setMode('script'),
   e: editSource,
@@ -949,10 +879,8 @@ $('help-dlg').onclick = (e) => {
   if (e.target === e.currentTarget) e.currentTarget.close();
 };
 
-applyFlags();
 setTheme(THEMES.includes(loadPref('theme')) ? loadPref('theme') : 'auto');
 setSrcFold(loadPref('srcFold', 'on') === 'on');
 load(); // empty first, so there is something to draw while the backend answers
 // start on a wsh example: the output type the policy / miniscript fields are made for
 loadExample(Math.max(0, scenarios.findIndex((s) => s.name.startsWith('P2WSH'))));
-setView(state.view);

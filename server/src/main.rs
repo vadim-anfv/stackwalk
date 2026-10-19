@@ -13,11 +13,6 @@ mod spend;
 mod trace;
 mod tree;
 
-// the deploy build of web/ that build.rs embeds: tested with the crate
-#[cfg(test)]
-#[path = "../build/web.rs"]
-mod web_build;
-
 #[cfg(debug_assertions)]
 use std::path::Path;
 

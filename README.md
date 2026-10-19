@@ -6,7 +6,6 @@ Write a Bitcoin spending condition as a policy, miniscript or descriptor (or raw
 - every spend path of the descriptor, including ones that fail and why
 - step through a run: what each opcode does, the stack (and the alt stack) after it
 - the witness or scriptSig as sent, its size in vbytes, op count and Bitcoin Core limits per path
-- predict mode: guess the next stack before it is shown
 - works on a phone
 
 Live at [vadim.rs/stackwalk](https://vadim.rs/stackwalk) (soon).

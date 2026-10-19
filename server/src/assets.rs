@@ -34,19 +34,18 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn root_is_the_page_without_train() {
+    async fn root_is_the_page() {
         let res = get("/", None).await;
         assert_eq!(res.status(), StatusCode::OK);
         assert_eq!(res.headers()[header::CONTENT_TYPE], "text/html; charset=utf-8");
         let body = String::from_utf8(to_bytes(res.into_body(), usize::MAX).await.unwrap().to_vec()).unwrap();
         assert!(body.contains("<title>"));
-        assert!(!body.to_lowercase().contains("train"));
     }
 
     #[tokio::test]
-    async fn modules_and_cut_ones() {
+    async fn modules_and_unknown_paths() {
         assert_eq!(get("/app.js", None).await.headers()[header::CONTENT_TYPE], "text/javascript; charset=utf-8");
-        assert_eq!(get("/train.js", None).await.status(), StatusCode::NOT_FOUND);
+        assert_eq!(get("/nope.js", None).await.status(), StatusCode::NOT_FOUND);
         assert_eq!(get("/../Cargo.toml", None).await.status(), StatusCode::NOT_FOUND);
     }
 

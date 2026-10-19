@@ -16,14 +16,7 @@
 <body>
   <header>
     <div class="brand">stack<span>walk</span></div>
-    <!-- explore alone needs no switch: hidden with one view (style.css) -->
-    <div class="seg views" id="view" role="tablist" aria-label="View">
-      <button data-view="explore">explore</button>
-      <!-- flag:train -->
-      <button data-view="train">train</button>
-      <!-- /flag:train -->
-    </div>
-    <div class="explore-only hdr">
+    <div class="hdr">
       <div class="seg" id="mode" role="group" aria-label="Mode">
         <button data-mode="miniscript">descriptor <kbd>D</kbd></button>
         <button data-mode="script">script only <kbd>S</kbd></button>
@@ -31,8 +24,7 @@
       <!-- phone: the toggles live here; desktop: app.js moves each into its [data-desk] slot -->
       <div class="toggles" id="toggles">
         <label class="toggle" title="Allow named test keys (A, B…) instead of real public keys. Signatures are symbolic; Bitcoin Core would reject such a descriptor."><input type="checkbox" id="keys-toggle"> test keys <kbd>K</kbd></label>
-        <label class="toggle flag-altStack" title="Show the alt stack. When off, scripts using OP_TOALTSTACK / OP_FROMALTSTACK are refused."><input type="checkbox" id="alt-toggle"> alt stack <kbd>A</kbd></label>
-        <label class="toggle flag-predict" title="Quiz yourself: after each step the new stack is hidden until you reveal it (Space)."><input type="checkbox" id="predict"> predict <kbd>P</kbd></label>
+        <label class="toggle alt-only" title="Show the alt stack. When off, scripts using OP_TOALTSTACK / OP_FROMALTSTACK are refused."><input type="checkbox" id="alt-toggle"> alt stack <kbd>A</kbd></label>
       </div>
     </div>
     <button id="theme" class="theme"></button>
@@ -48,12 +40,11 @@
     <div class="help-head"><h2>keyboard shortcuts</h2><button id="help-close" aria-label="Close">×</button></div>
     <div class="help-cols">
       <section>
-        <h3>explore</h3>
         <dl>
           <dt><kbd>→</kbd> <kbd>l</kbd></dt><dd>next step</dd>
           <dt><kbd>←</kbd> <kbd>h</kbd></dt><dd>previous step</dd>
           <dt><kbd>Home</kbd> <kbd>End</kbd></dt><dd>first / last step</dd>
-          <dt><kbd>Space</kbd></dt><dd>next step<span class="flag-predict">, or reveal the stack in predict</span></dd>
+          <dt><kbd>Space</kbd></dt><dd>next step</dd>
           <dt><kbd>N</kbd></dt><dd>next spend path (after the last, the first)</dd>
           <dt><kbd>E</kbd></dt><dd>edit the source: the first field with text</dd>
           <dt><kbd>Enter</kbd></dt><dd>in a source field: compile and leave it</dd>
@@ -61,27 +52,14 @@
           <dt><kbd>Esc</kbd></dt><dd>leave the source field</dd>
           <dt><kbd>D</kbd> <kbd>S</kbd></dt><dd>descriptor / script mode</dd>
           <dt><kbd>K</kbd></dt><dd>test keys on / off</dd>
-          <dt class="flag-altStack"><kbd>A</kbd></dt><dd class="flag-altStack">alt stack on / off</dd>
-          <dt class="flag-predict"><kbd>P</kbd></dt><dd class="flag-predict">predict on / off</dd>
+          <dt><kbd>A</kbd></dt><dd>alt stack on / off</dd>
           <dt><kbd>?</kbd></dt><dd>this list</dd>
         </dl>
       </section>
-      <!-- flag:train -->
-      <section class="flag-train">
-        <h3>train</h3>
-        <dl>
-          <dt><kbd>Enter</kbd></dt><dd>check the answer, then the next task</dd>
-          <dt><kbd>Ctrl</kbd>+<kbd>Enter</kbd></dt><dd>skip to the next task</dd>
-          <dt><kbd>Tab</kbd></dt><dd>take the suggestion</dd>
-          <dt><kbd>↑</kbd> <kbd>↓</kbd></dt><dd>move through suggestions</dd>
-          <dt><kbd>Esc</kbd></dt><dd>close the suggestions</dd>
-        </dl>
-      </section>
-      <!-- /flag:train -->
     </div>
   </dialog>
 
-  <main class="explore-only explore">
+  <main class="explore">
     <!-- one frame behind the step card, the script and the stack: they show the same step -->
     <div class="run-frame" aria-hidden="true"></div>
     <!-- desktop: the top row of the run frame; phone: a footer stuck to the bottom -->
@@ -95,7 +73,6 @@
         <span id="counter" class="muted counter"></span>
         <div id="timeline" class="timeline" title="← → / h l step · Home End"></div>
         <span id="result" class="result"></span>
-        <span class="toggle-slot" data-desk="predict"></span>
       </div>
     </nav>
     <section class="left">
@@ -207,7 +184,7 @@
           <h2>stack <span class="muted">top ↑</span><span class="toggle-slot" data-desk="alt-toggle"></span></h2>
           <div class="well"><div id="stack" class="stack"></div></div>
         </div>
-        <div class="panel stackbox side flag-altStack">
+        <div class="panel stackbox side alt-only">
           <h2>alt stack <span class="muted">top ↑</span></h2>
           <div class="well"><div id="alt" class="stack"></div></div>
         </div>
@@ -215,56 +192,6 @@
       </div>
     </section>
   </main>
-
-  <!-- flag:train -->
-  <main class="train-only train">
-    <section class="t-main">
-      <div class="panel task">
-        <div class="task-head">
-          <span class="k">write the Script for</span>
-          <span class="muted"><span id="t-level"></span> · <span id="t-timer">0.0s</span></span>
-        </div>
-        <code id="t-ms" class="t-ms"></code>
-      </div>
-
-      <div class="panel">
-        <div id="t-palette" class="palette"></div>
-        <textarea id="t-input" rows="3" spellcheck="false" autocomplete="off" autocorrect="off" autocapitalize="off" placeholder="type ops with spaces: aliases, full names, keys like A, numbers"></textarea>
-        <div id="t-suggest" class="suggest"></div>
-        <div id="t-preview" class="toks preview"></div>
-        <div class="t-actions">
-          <button id="t-check">check <kbd>Enter</kbd></button>
-          <button id="t-answer">show answer</button>
-          <button id="t-next">skip <kbd>Ctrl+Enter</kbd></button>
-        </div>
-      </div>
-
-      <div id="t-result" class="panel t-result"></div>
-    </section>
-
-    <aside class="t-side">
-      <div class="panel">
-        <h2>session</h2>
-        <div id="t-stats" class="stats"></div>
-      </div>
-      <div class="panel flag-leaderboard">
-        <div class="board-head">
-          <h2>leaderboard</h2>
-          <div class="seg small" id="t-board-tabs">
-            <button data-board="today">today</button>
-            <button data-board="week">week</button>
-            <button data-board="all">all time</button>
-          </div>
-        </div>
-        <table id="t-board" class="board"></table>
-      </div>
-      <div class="panel">
-        <h2>aliases</h2>
-        <div id="t-cheats" class="cheats"></div>
-      </div>
-    </aside>
-  </main>
-  <!-- /flag:train -->
 
 
   <!-- desktop only: phones keep the bottom for the step bar -->

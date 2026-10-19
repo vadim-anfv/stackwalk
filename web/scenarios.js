@@ -47,7 +47,7 @@ export const scenarios = [
     about: 'Data carrier output. Execution stops at OP_RETURN, so it can never be spent; nodes drop it from the UTXO set.',
   },
   { group: 'miniscript', name: 'A and B', api: { kind: 'policy', text: 'and(pk(A),pk(B))' } },
-  { group: 'miniscript', name: 'A and B via alt stack', flag: 'altStack', api: { kind: 'miniscript', text: 'and_b(pk(A),a:pk(B))' } },
+  { group: 'miniscript', name: 'A and B via alt stack', alt: true, api: { kind: 'miniscript', text: 'and_b(pk(A),a:pk(B))' } },
   { group: 'miniscript', name: 'key + timelocked recovery', api: { kind: 'policy', text: 'or(pk(A),and(pk(B),older(144)))' } },
   { group: 'miniscript', name: 'hash locks', api: { kind: 'policy', text: 'or(and(pk(A),sha256(H)),and(pk(B),older(10)))' } },
   {
