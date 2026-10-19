@@ -1,6 +1,15 @@
 //! The JSON API (types and their meaning in `model.rs`), with the limits that keep one request, or a burst of
 //! them, from taking the server: input and body size, time per compile, compiles at once.
 //! Rate limiting per client is the reverse proxy's job (nginx `limit_req`).
+//!
+//! `POST /api/compile` answers 200 with a `Scenario`, or `{"error": "..."}` with:
+//! - 400: parse / compile errors, taproot, a body that is not JSON, and the size limits of
+//!   `scenario.rs` / `paths.rs` (policy conditions, spend paths, stack items in the answer);
+//! - 413: source text or body over `Limits`; 415: not `Content-Type: application/json`;
+//! - 503: over `Limits::time`, waiting for a slot included; 500: the compile panicked.
+//!
+//! `GET /api/ping`: `{"ok": true, "version": ...}`. Release builds add security headers
+//! (`secure`); `/metrics` is on a separate, private listener (`metrics_router`).
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 

@@ -1,5 +1,5 @@
 // Examples for the picker. Each is compiled and run by the backend
-// (POST /api/compile with `api`, see API.md); `about` explains the template.
+// (POST /api/compile with `api`, see server/src/model.rs); `about` explains the template.
 
 export const groups = { templates: 'standard templates', miniscript: 'miniscript' };
 

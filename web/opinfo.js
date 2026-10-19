@@ -1,4 +1,4 @@
-// How instructions from the backend (API.md: Ins) are shown and explained.
+// How instructions from the backend (server/src/model.rs: Ins) are shown and explained.
 
 export function opText(ins) {
   if (ins.op === 'PHASE') return `· ${ins.label} ·`;

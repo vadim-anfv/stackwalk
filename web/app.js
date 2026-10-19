@@ -11,13 +11,13 @@ const state = {
   step: 0,
   mode: loadPref('mode', 'miniscript'),
   source: 'policy', // which field the user typed into last: policy, miniscript or descriptor
-  wrap: 'wsh', // output type policy / miniscript are built for (API.md); an example sets it
+  wrap: 'wsh', // output type policy / miniscript are built for (server/src/model.rs); an example sets it
   drafts: {}, // text that failed to compile, kept per field until fixed or an example is picked
   alt: loadPref('alt', 'off') === 'on',
   scriptView: loadPref('scriptView', 'grouped'), // desktop listing: 'grouped' by leaf fragment or 'ops', one per line
   testKeys: loadPref('testKeys', 'off') === 'on', // opt-in: named keys are not a real descriptor
   blocked: null, // why the script is refused: 'alt' | 'keys' | null
-  live: null, // scenario from the backend (API.md); null = nothing compiled yet
+  live: null, // scenario from the backend (server/src/model.rs); null = nothing compiled yet
   origin: null, // the typed source `live` was compiled from ({kind, text, wrap}); null for an example
 };
 let reqSeq = 0; // the latest backend request wins
@@ -151,7 +151,7 @@ function sourceText(sc, kind) {
     .join(' ');
 }
 
-// POST /api/compile (API.md). {sc} on success, {error} on a compile error,
+// POST /api/compile (server/src/model.rs, api.rs). {sc} on success, {error} on a compile error,
 // {offline: true} when the backend is not reachable (the page is cached, or served by something else)
 async function compile(body) {
   try {
