@@ -28,7 +28,7 @@
         <button data-mode="miniscript">descriptor <kbd>D</kbd></button>
         <button data-mode="script">script only <kbd>S</kbd></button>
       </div>
-      <!-- phone: the toggles live here; desktop: app.js moves each into its .toggle-slot -->
+      <!-- phone: the toggles live here; desktop: app.js moves each into its [data-desk] slot -->
       <div class="toggles" id="toggles">
         <label class="toggle" title="Allow named test keys (A, B…) instead of real public keys. Signatures are symbolic; Bitcoin Core would reject such a descriptor."><input type="checkbox" id="keys-toggle"> test keys <kbd>K</kbd></label>
         <label class="toggle flag-altStack" title="Show the alt stack. When off, scripts using OP_TOALTSTACK / OP_FROMALTSTACK are refused."><input type="checkbox" id="alt-toggle"> alt stack <kbd>A</kbd></label>
@@ -94,7 +94,7 @@
         <span id="counter" class="muted counter"></span>
         <div id="timeline" class="timeline" title="← → / h l step · Home End"></div>
         <span id="result" class="result"></span>
-        <span class="toggle-slot" data-toggle="predict"></span>
+        <span class="toggle-slot" data-desk="predict"></span>
       </div>
     </nav>
     <section class="left">
@@ -106,6 +106,8 @@
           <label class="example"><span class="k">example</span><select id="scenario" aria-label="Example"></select></label>
           <button id="src-fold" class="fold" aria-label="Show or hide the source fields"></button>
         </div>
+        <!-- desktop: the example picker, a row like spend path below it -->
+        <div class="paths" data-desk="scenario"></div>
         <!-- which spend path runs: outside .src-body, so a folded source (phone) still shows it -->
         <div class="paths">
           <label for="paths" class="k">spend path</label>
@@ -113,7 +115,7 @@
         </div>
         <div class="src-body">
         <!-- desktop: test keys, under the fields' labels; it decides how they are read -->
-        <div class="toggle-slot keys-slot" data-toggle="keys-toggle"></div>
+        <div class="toggle-slot keys-slot" data-desk="keys-toggle"></div>
         <div class="field ms-only">
           <label for="in-policy" class="k">policy</label>
           <textarea id="in-policy" class="src-input" data-kind="policy" rows="1" spellcheck="false" autocomplete="off" autocorrect="off" autocapitalize="off" placeholder="and(pk(A),pk(B))"></textarea>
@@ -191,7 +193,7 @@
       <div class="panel strip-panel"><ol id="strip" class="strip"></ol></div>
       <div class="stacks">
         <div class="panel stackbox">
-          <h2>stack <span class="muted">top ↑</span><span class="toggle-slot" data-toggle="alt-toggle"></span></h2>
+          <h2>stack <span class="muted">top ↑</span><span class="toggle-slot" data-desk="alt-toggle"></span></h2>
           <div class="well"><div id="stack" class="stack"></div></div>
         </div>
         <div class="panel stackbox side flag-altStack">

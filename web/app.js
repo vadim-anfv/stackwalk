@@ -748,15 +748,20 @@ function setAlt(on) {
 // crossing the phone width turns the alt stack on or off
 PHONE.onchange = reload;
 
-// desktop: each toggle sits next to what it changes; phone: all of them in the header
-const placeToggles = () => {
-  for (const id of ['keys-toggle', 'alt-toggle', 'predict']) {
-    const home = PHONE.matches ? $('toggles') : document.querySelector(`[data-toggle="${id}"]`);
-    home.append($(id).closest('label'));
+// desktop: some controls move into [data-desk] slots, next to what they change;
+// phone: they stay where the markup has them (the toggles in the header)
+const movable = [...document.querySelectorAll('[data-desk]')].map((slot) => {
+  const el = $(slot.dataset.desk).closest('label');
+  return { el, slot, home: el.parentNode, next: el.nextSibling };
+});
+const placeControls = () => {
+  for (const { el, slot, home, next } of movable) {
+    if (PHONE.matches) home.insertBefore(el, next);
+    else slot.append(el);
   }
 };
-placeToggles();
-PHONE.addEventListener('change', placeToggles);
+placeControls();
+PHONE.addEventListener('change', placeControls);
 
 $('alt-toggle').onchange = (e) => {
   e.target.blur();
