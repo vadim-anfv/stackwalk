@@ -104,7 +104,6 @@
         <div class="src-head">
           <h2>source <kbd title="Edit the source (E)">E</kbd></h2>
           <label class="example"><span class="k">example</span><select id="scenario" aria-label="Example"></select></label>
-          <span class="toggle-slot" data-toggle="keys-toggle"></span>
           <button id="src-fold" class="fold" aria-label="Show or hide the source fields"></button>
         </div>
         <!-- which spend path runs: outside .src-body, so a folded source (phone) still shows it -->
@@ -113,6 +112,8 @@
           <select id="paths"></select>
         </div>
         <div class="src-body">
+        <!-- desktop: test keys, under the fields' labels; it decides how they are read -->
+        <div class="toggle-slot keys-slot" data-toggle="keys-toggle"></div>
         <div class="field ms-only">
           <label for="in-policy" class="k">policy</label>
           <textarea id="in-policy" class="src-input" data-kind="policy" rows="1" spellcheck="false" autocomplete="off" autocorrect="off" autocapitalize="off" placeholder="and(pk(A),pk(B))"></textarea>

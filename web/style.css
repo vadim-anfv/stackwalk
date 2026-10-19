@@ -614,6 +614,7 @@ textarea.src-input { display: block; resize: none; overflow: hidden; overflow-wr
   .toggle-slot { font-size: 13px; font-weight: 400; color: var(--text); text-transform: none; letter-spacing: 0; }
   .stackbox h2 { display: flex; align-items: center; gap: 6px; }
   .stackbox h2 .toggle-slot { margin-left: auto; }
+  .keys-slot { padding: 0 0 8px 88px; }
   /* branches (IF / ELSE) stand out in the listing */
   .script { --indent: 32px; }
   /* room to spare: taller ticks so the mini stacks read */
