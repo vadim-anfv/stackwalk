@@ -276,6 +276,25 @@ fn pick_and_roll_past_the_stack_fail_the_script_not_the_server() {
 }
 
 #[test]
+fn op_reserved_fails_only_when_executed() {
+    // as Core: a reserved opcode in a branch not taken is fine
+    let sc = ok("script", "OP_0 OP_IF OP_RESERVED OP_ENDIF OP_1", None);
+    assert!(sc.traces[0].result.ok, "{}", sc.traces[0].result.message);
+    let sc = ok("script", "OP_RESERVED OP_1", None);
+    assert!(!sc.traces[0].result.ok);
+}
+
+#[test]
+fn small_pushes_are_written_as_the_minimal_opcodes() {
+    // <0x81> is OP_1NEGATE and <0x05> is OP_5: the parser must not build pushes the
+    // engine then refuses as non-minimal
+    for script in ["<0x81> OP_1NEGATE OP_EQUAL", "<0x05> OP_5 OP_EQUAL", "<0x> OP_0 OP_EQUAL"] {
+        let sc = ok("script", script, None);
+        assert!(sc.traces[0].result.ok, "{script}: {}", sc.traces[0].result.message);
+    }
+}
+
+#[test]
 fn a_bad_key_with_wide_characters_is_an_error_not_a_crash() {
     // shortening the key for the message cut it inside a character
     let err = run("policy", "pk([ééééééééééééééééééééé])", None).unwrap_err();

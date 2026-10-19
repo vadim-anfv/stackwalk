@@ -234,12 +234,9 @@ impl Exec {
         }
 
         // We want to make sure the script is valid so we don't have to throw parsing errors
-        // while executing.
-        let instructions = if opt.require_minimal {
-            script.instructions_minimal()
-        } else {
-            script.instructions()
-        };
+        // while executing. Minimal pushes are checked as they run, as Core does (MINIMALDATA
+        // applies to executed pushes only).
+        let instructions = script.instructions();
         if let Some(err) = instructions.clone().find_map(|res| res.err()) {
             return Err(Error::InvalidScript(err));
         }
@@ -252,11 +249,7 @@ impl Exec {
         // We box alocate the script to get a static Instructions iterator.
         // We will manually drop this allocation in the ops::Drop impl.
         let script = Box::leak(script.into_boxed_script()) as &'static Script;
-        let instructions = if opt.require_minimal {
-            script.instructions_minimal()
-        } else {
-            script.instructions()
-        };
+        let instructions = script.instructions();
 
         //TODO(stevenroose) make this more efficient
         let witness_size =
@@ -514,6 +507,9 @@ impl Exec {
                     return self.fail(ExecError::PushSize);
                 }
                 if exec {
+                    if self.opt.require_minimal && !minimal_push(self.script.as_bytes()[self.current_position], p.as_bytes()) {
+                        return self.fail(ExecError::MinimalData);
+                    }
                     self.stack.pushstr(p.as_bytes());
                 }
             }
@@ -538,10 +534,6 @@ impl Exec {
                     | OP_2MUL | OP_2DIV | OP_MUL | OP_DIV | OP_MOD | OP_LSHIFT | OP_RSHIFT => {
                         return self.failop(ExecError::DisabledOpcode, op);
                     }
-                    OP_RESERVED => {
-                        return self.failop(ExecError::Debug, op);
-                    }
-
                     _ => {}
                 }
 
@@ -610,6 +602,19 @@ pub fn read_scriptint_size(v: &[u8], max_size: usize, minimal: bool) -> Result<i
     }
 
     Ok(scriptint_parse(v))
+}
+
+/// Core's CheckMinimalPush: `data` pushed by the opcode byte `op` the shortest way.
+fn minimal_push(op: u8, data: &[u8]) -> bool {
+    use bitcoin::opcodes::all::{OP_PUSHDATA1, OP_PUSHDATA2};
+    match data {
+        [] => op == 0x00,                       // OP_0
+        [1..=16] | [0x81] => false,             // OP_1..OP_16, OP_1NEGATE (not pushes here)
+        d if d.len() <= 75 => usize::from(op) == d.len(),
+        d if d.len() <= 255 => op == OP_PUSHDATA1.to_u8(),
+        d if d.len() <= 65535 => op == OP_PUSHDATA2.to_u8(),
+        _ => true,
+    }
 }
 
 /// Caller to guarantee that `v` is not empty.

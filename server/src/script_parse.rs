@@ -2,7 +2,6 @@
 use std::collections::BTreeMap;
 
 use miniscript::bitcoin::hashes::{Hash, hash160};
-use miniscript::bitcoin::opcodes::all::{OP_DUP, OP_HASH160};
 use miniscript::bitcoin::script::{Builder, PushBytesBuf};
 use miniscript::bitcoin::{PublicKey, ScriptBuf};
 use miniscript::{Miniscript, Segwitv0};
@@ -50,8 +49,14 @@ pub fn parse(ring: &mut KeyRing, text: &str) -> Result<ScriptBuf, String> {
             } else {
                 return Err(format!("cannot parse push {tok}"));
             };
-            let pb = PushBytesBuf::try_from(bytes).map_err(|_| format!("push too large: {tok}"))?;
-            b = b.push_slice(pb);
+            // the minimal opcode where there is one (Core's MINIMALDATA): empty is OP_0,
+            // 1..16 are OP_1..OP_16, 0x81 is OP_1NEGATE
+            b = match bytes.as_slice() {
+                [] => b.push_int(0),
+                [n @ 1..=16] => b.push_int(i64::from(*n)),
+                [0x81] => b.push_int(-1),
+                _ => b.push_slice(PushBytesBuf::try_from(bytes).map_err(|_| format!("push too large: {tok}"))?),
+            };
         } else if let Ok(n) = tok.parse::<i64>() {
             b = b.push_int(n);
         } else {
@@ -59,7 +64,6 @@ pub fn parse(ring: &mut KeyRing, text: &str) -> Result<ScriptBuf, String> {
             b = b.push_opcode(op);
         }
     }
-    let _ = (OP_DUP, OP_HASH160);
     Ok(b.into_script())
 }
 
