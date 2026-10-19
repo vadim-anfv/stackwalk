@@ -336,6 +336,22 @@ fn small_pushes_are_written_as_the_minimal_opcodes() {
 }
 
 #[test]
+fn a_miniscript_mixing_height_and_time_locks_is_refused() {
+    // no spend can meet both: its passing path was silently dropped, and the one failing
+    // variant left lost the height lock from its name
+    for (kind, text, wrap) in [
+        ("descriptor", "wsh(and_v(v:after(1),after(500000001)))", None),
+        ("miniscript", "and_v(v:pk(A),and_v(v:after(1),after(500000001)))", Some("wsh")),
+        ("descriptor", "wsh(and_v(v:older(1),older(4194305)))", None),
+    ] {
+        let err = run(kind, text, wrap).unwrap_err();
+        assert!(err.contains("timelock"), "{text}: {err}");
+    }
+    // one kind of each is fine
+    assert!(run("descriptor", "wsh(and_v(v:after(1),older(4194305)))", None).is_ok());
+}
+
+#[test]
 fn script_numbers_are_bounded_as_core_parses_them() {
     // i64::MIN panicked inside rust-bitcoin's push_int; Core's ParseScript takes +-0xffffffff
     for text in ["-9223372036854775808", "<-9223372036854775808>", "4294967296", "<-4294967296>"] {

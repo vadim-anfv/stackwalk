@@ -409,6 +409,10 @@ fn witness<Ctx: ScriptContext>(
 
 /// `pk(X)` as bare is the P2PK template, its paths named like pkh ("A signs", "B tries").
 fn build_ms<Ctx: ScriptContext>(ring: &mut KeyRing, wrap: Wrap, named: &Miniscript<String, Ctx>, policy: Option<String>) -> Result<Scenario, String> {
+    // a path that needs a height lock and a time lock of the same kind can never be spent
+    if named.has_mixed_timelocks() {
+        return Err("a spend path mixes a height timelock and a time timelock of the same kind (after / after or older / older): no transaction can meet both".into());
+    }
     let ms: Miniscript<PublicKey, Ctx> =
         named.translate_pk(&mut NameTranslator(ring)).map_err(|e| format!("key translation: {e:?}"))?;
     let inner = ms.encode();
@@ -459,7 +463,13 @@ fn build_ms<Ctx: ScriptContext>(ring: &mut KeyRing, wrap: Wrap, named: &Miniscri
     let mut traces = Vec::new();
     for sp in &spends {
         let (tx, prevouts) = dummy_tx(&spk, sp.sequence, sp.lock_time);
-        let Some(stack) = witness(ring, &ms, sp, &sigctx, &tx) else { continue };
+        let Some(stack) = witness(ring, &ms, sp, &sigctx, &tx) else {
+            // a failing variant is only an illustration; a passing path must not vanish unsaid
+            if sp.fails {
+                continue;
+            }
+            return Err(format!("could not build a witness for the spend path \"{}\"", sp.name));
+        };
         // as sent: the witnessScript / redeemScript follows the stack items
         let with_script = || stack.iter().cloned().chain([inner.to_bytes()]).collect::<Vec<_>>();
         let spend = match wrap {
