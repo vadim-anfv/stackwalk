@@ -31,10 +31,11 @@ fn real_hash(tok: &str, parent: &str) -> bool {
 /// (test name, real key or hash) pairs, in order of first appearance.
 pub type Aliases = Vec<(String, String)>;
 
-/// Rewrite every argument token of `text`: `f(token, enclosing fragment)` returns the replacement, if any.
-fn map_args(text: &str, mut f: impl FnMut(&str, &str) -> Option<String>) -> String {
+/// Rewrite every argument token of `text`: `f(token, enclosing fragment, argument index)`
+/// returns the replacement, if any.
+fn map_args(text: &str, mut f: impl FnMut(&str, &str, usize) -> Option<String>) -> String {
     let mut out = String::with_capacity(text.len());
-    let mut fns: Vec<String> = Vec::new();
+    let mut fns: Vec<(String, usize)> = Vec::new();
     let mut tok = String::new();
     for c in text.chars() {
         match c {
@@ -43,18 +44,20 @@ fn map_args(text: &str, mut f: impl FnMut(&str, &str) -> Option<String>) -> Stri
                 let name = tok.rsplit([':', '@']).next().unwrap_or("").to_string();
                 out.push_str(&tok);
                 tok.clear();
-                fns.push(name);
+                fns.push((name, 0));
                 out.push(c);
             }
             ',' | ')' => {
-                let parent = fns.last().map(String::as_str).unwrap_or("");
-                match f(tok.trim(), parent) {
+                let (parent, i) = fns.last().map_or(("", 0), |(n, i)| (n.as_str(), *i));
+                match f(tok.trim(), parent, i) {
                     Some(r) => out.push_str(&r),
                     None => out.push_str(&tok),
                 }
                 tok.clear();
                 if c == ')' {
                     fns.pop();
+                } else if let Some((_, i)) = fns.last_mut() {
+                    *i += 1;
                 }
                 out.push(c);
             }
@@ -103,7 +106,7 @@ pub fn is_hash_name(name: &str) -> bool {
 pub fn alias(text: &str) -> Result<(String, Aliases), String> {
     // every name already in the text (test keys, hash names) is taken
     let mut used = BTreeSet::new();
-    map_args(text, |tok, _| {
+    map_args(text, |tok, _, _| {
         used.insert(tok.to_string());
         None
     });
@@ -114,7 +117,7 @@ pub fn alias(text: &str) -> Result<(String, Aliases), String> {
     // a key is one key wherever it is; a hash only within its hash function (no preimage
     // matches both sha256(h) and hash256(h))
     let mut seen: Vec<(&str, String, String)> = Vec::new();
-    let out = map_args(text, |tok, parent| {
+    let out = map_args(text, |tok, parent, _| {
         let hash = real_hash(tok, parent);
         if !hash {
             match real_key(tok, parent)? {
@@ -143,10 +146,11 @@ pub fn alias(text: &str) -> Result<(String, Aliases), String> {
 /// The test names (keys and hash names, not real ones) in a text, in order of first appearance.
 pub fn test_names(text: &str) -> Vec<String> {
     let mut names: Vec<String> = Vec::new();
-    map_args(text, |tok, parent| {
+    map_args(text, |tok, parent, i| {
         let in_fn = KEY_FNS.contains(&parent) || HASH_FNS.iter().any(|(f, _)| *f == parent);
-        // multi's threshold is a number
-        let name = in_fn && !tok.is_empty() && !tok.chars().all(|c| c.is_ascii_digit());
+        // the threshold of multi, not a key; a name may be digits only (`pk(1)`)
+        let threshold = i == 0 && parent.contains("multi");
+        let name = in_fn && !tok.is_empty() && !threshold;
         if name && !real_hash(tok, parent) && real_key(tok, parent).is_none() && !names.iter().any(|n| n == tok) {
             names.push(tok.to_string());
         }
@@ -160,7 +164,7 @@ pub fn restore(text: &str, aliases: &Aliases) -> String {
     if aliases.is_empty() {
         return text.to_string();
     }
-    map_args(text, |tok, parent| {
+    map_args(text, |tok, parent, _| {
         if !KEY_FNS.contains(&parent) && !HASH_FNS.iter().any(|(f, _)| *f == parent) {
             return None;
         }

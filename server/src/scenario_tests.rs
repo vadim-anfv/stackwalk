@@ -124,7 +124,7 @@ fn miniscript_outside_wsh_is_flagged() {
 #[test]
 fn plain_descriptors_are_not_flagged() {
     // pk() (BIP-381) and multi() (BIP-383) are valid in sh() and bare
-    for d in ["pk(A)", "multi(1,A,B)", "sh(multi(2,A,B))", "sh(pk(A))", "pkh(A)", "wpkh(A)", "wsh(multi(2,A,B,C))"] {
+    for d in ["pk(A)", "multi(1,A,B)", "sh(multi(2,A,B))", "sh(pk(A))", "sh(pkh(A))", "pkh(A)", "wpkh(A)", "wsh(multi(2,A,B,C))"] {
         assert!(!ok("descriptor", d, None).outside_bip379, "{d}");
     }
     assert!(!ok("policy", "pk(A)", Some("bare")).outside_bip379);
@@ -363,6 +363,31 @@ fn failures_are_worded_and_policy_rules_say_so() {
     let wrong = sc.paths.iter().position(|p| p.fails).unwrap();
     let m = &sc.traces[wrong].result.message;
     assert!(m.contains("NULLFAIL") && m.contains("policy"), "{m}");
+    // but a wrong signature is not fine by consensus: CHECKSIG pushes false, VERIFY fails
+    assert!(m.contains("push false"), "{m}");
+    let sc = ok("miniscript", "and_v(v:pk(A),pk(B))", None);
+    let m = &sc.traces[sc.paths.iter().position(|p| p.fails).unwrap()].result.message;
+    assert!(m.contains("OP_CHECKSIGVERIFY") && m.contains("by consensus too"), "{m}");
+}
+
+#[test]
+fn a_timelock_note_on_a_non_minimal_operand_does_not_guess() {
+    // the engine fails on MINIMALDATA before the sign: the note said "negative locktime"
+    for text in ["<0x0180> OP_CHECKSEQUENCEVERIFY", "<0x0180> OP_CHECKLOCKTIMEVERIFY"] {
+        let sc = ok("script", text, None);
+        let step = sc.traces[0].steps.iter().find(|s| s.error.is_some()).expect("it fails");
+        assert!(step.error.as_deref().is_some_and(|e| e.contains("MINIMALDATA")), "{text}: {:?}", step.error);
+        assert!(!step.note.contains("negative"), "{text}: {}", step.note);
+    }
+}
+
+#[test]
+fn digit_names_are_test_names_too() {
+    // only multi's threshold is a number; `pk(1)` said "key too short"
+    let note = |kind: &str, text: &str, wrap: Option<&str>| ok(kind, text, wrap).import_note;
+    assert_eq!(note("miniscript", "pk(1)", Some("wsh")).as_deref(), Some("test names, not real keys or hashes: 1"));
+    assert_eq!(note("descriptor", "wsh(and_v(v:pk(A),sha256(12)))", None).as_deref(), Some("test names, not real keys or hashes: A, 12"));
+    assert_eq!(note("descriptor", "wsh(multi(2,A,3))", None).as_deref(), Some("test names, not real keys or hashes: A, 3"));
 }
 
 #[test]

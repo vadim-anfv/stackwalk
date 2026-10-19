@@ -245,6 +245,10 @@ fn is_pk<Ctx: ScriptContext>(ms: &Miniscript<String, Ctx>) -> bool {
     matches!(ms.as_inner(), Terminal::Check(c) if matches!(c.as_inner(), Terminal::PkK(_)))
 }
 
+fn is_pkh<Ctx: ScriptContext>(ms: &Miniscript<String, Ctx>) -> bool {
+    matches!(ms.as_inner(), Terminal::Check(c) if matches!(c.as_inner(), Terminal::PkH(_)))
+}
+
 /// The key of `pk(X)` / `pkh(X)`.
 fn single_key<Ctx: ScriptContext>(ms: &Miniscript<String, Ctx>) -> Option<&String> {
     match ms.as_inner() {
@@ -518,8 +522,9 @@ fn build_ms<Ctx: ScriptContext>(ring: &mut KeyRing, wrap: Wrap, named: &Miniscri
         policy,
         miniscript: Some(ms_text),
         descriptor: Some(descriptor),
-        // BIP-379 excludes P2SH and bare; pk() (BIP-381) and multi() (BIP-383) are plain descriptors there
-        outside_bip379: wrap != Wrap::Wsh && !(is_pk(named) || matches!(named.as_inner(), Terminal::Multi(_))),
+        // BIP-379 excludes P2SH and bare; pk(), pkh() (BIP-381) and multi() (BIP-383) are plain
+        // descriptors there
+        outside_bip379: wrap != Wrap::Wsh && !(is_pk(named) || is_pkh(named) || matches!(named.as_inner(), Terminal::Multi(_))),
         tree: Some(node),
         ..Scenario::new(wrap.name(), script_text(ring, &spk), script, inner.len(), path_infos, traces)
     })

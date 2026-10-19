@@ -76,7 +76,13 @@ fn err_text(e: &ExecError, op: Option<Opcode>) -> String {
     match e {
         CheckSigVerify => "signature check failed".into(),
         CheckMultiSigVerify => "multisig check failed".into(),
-        NullFail => format!("signature check failed: a failing signature must be empty (NULLFAIL, {POLICY})"),
+        // Core reports NULLFAIL first, but the spend is no better by consensus alone
+        NullFail if matches!(op, Some(OP_CHECKSIGVERIFY | OP_CHECKMULTISIGVERIFY)) => {
+            format!("signature check failed, by consensus too (also NULLFAIL, {POLICY}: a failing signature must be empty)")
+        }
+        NullFail => format!(
+            "signature check failed: a failing signature must be empty (NULLFAIL, {POLICY}); by consensus alone the check would push false and the script go on"
+        ),
         NullDummy => "the CHECKMULTISIG dummy element must be empty (NULLDUMMY)".into(),
         EqualVerify => "values are not equal".into(),
         NumEqualVerify => "numbers are not equal".into(),
@@ -353,6 +359,8 @@ impl<'a> Runner<'a> {
             // the reasons in the order the engine checks them (scriptexec OP_CSV / OP_CLTV, then
             // check_sequence / check_lock_time), so the note names the one that decided. Our
             // spends are version 2 and never final, so those checks never decide here.
+            // the engine reads the operand as minimal first: a non-minimal one fails on that
+            OP_CSV | OP_CLTV if prev.last().is_some_and(|e| read_scriptint(&e.data, 5, true).is_err()) => String::new(),
             OP_CSV | OP_CLTV if num(1).is_some_and(|n| n < 0) => "negative locktime: fails".into(),
             OP_CSV => {
                 let n = num(1).unwrap_or(0);
@@ -363,12 +371,13 @@ impl<'a> Runner<'a> {
                     _ if n & (1 << 31) != 0 => "disable flag set: CSV acts as a NOP".into(),
                     (None, _) => "input nSequence disables relative timelocks".into(),
                     (Some(have), Some(want)) if std::mem::discriminant(&have) != std::mem::discriminant(&want) => {
-                        format!("input age is {}, the script asks for {}: a timelock of the other kind", rel_text(have, false), rel_text(want, true))
+                        format!("input nSequence is {}, the script asks for {}: a timelock of the other kind", rel_text(have, true), rel_text(want, true))
                     }
-                    (Some(have), Some(want)) => {
-                        let rel = if err.is_none() { ">=" } else { "<" };
-                        format!("input age {} {rel} {}", rel_text(have, false), rel_text(want, true))
+                    // CSV compares numbers; BIP68 is what makes nSequence an age the coin must reach
+                    (Some(have), Some(want)) if err.is_none() => {
+                        format!("input nSequence {} >= {}; BIP68 then holds the spend until the coin is that old", rel_text(have, false), rel_text(want, true))
                     }
+                    (Some(have), Some(want)) => format!("input nSequence {} < {}", rel_text(have, false), rel_text(want, true)),
                     _ => String::new(),
                 }
             }
