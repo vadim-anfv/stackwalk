@@ -63,4 +63,4 @@ With **test keys** on, keys are names (`A`, `B`, ...) mapped to fixed test keys,
 
 ## License
 
-TBD
+Licensed under either of [Apache License, Version 2.0](LICENSE-APACHE) or [MIT license](LICENSE-MIT) at your option. Exceptions (the vendored interpreter, the title font) are listed in [LICENSE](LICENSE).

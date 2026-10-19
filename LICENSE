@@ -1,0 +1,8 @@
+This software is licensed under [Apache 2.0](LICENSE-APACHE) or [MIT](LICENSE-MIT), at your option.
+
+Except as otherwise noted, all files in this repository are licensed under the Apache License, Version 2.0 <LICENSE-APACHE or http://www.apache.org/licenses/LICENSE-2.0> or the MIT license <LICENSE-MIT or http://opensource.org/licenses/MIT>, at your option.
+
+Exceptions:
+
+- `server/src/scriptexec/` is vendored from https://github.com/BitVM/rust-bitcoin-scriptexec, CC0-1.0, with local changes (listed in its `mod.rs`).
+- `web/bicubik.woff` is the Bicubik font by Anton Kudin (Jovanny Lemonad), distributed as freeware under its own terms.
