@@ -2,6 +2,7 @@
 use bitcoin::hex::FromHex;
 use bitcoin::secp256k1;
 use bitcoin::sighash::EcdsaSighashType;
+use bitcoin::transaction;
 
 use super::*;
 
@@ -89,6 +90,38 @@ fn segwit_sighash_commits_to_the_raw_hashtype() {
     let res = run_with(opt, ExecCtx::SegwitV0, tmpl, script, vec![sign(&sk, digest, 0x21)]);
     assert_eq!(res.error, None);
     assert!(res.success, "the signature over the raw hashtype is valid");
+}
+
+/// `<operand> CHECKSEQUENCEVERIFY` in a tx of `version` whose input has `sequence`.
+fn csv(version: i32, sequence: u32, operand: i64) -> Option<ExecError> {
+    let mut tmpl = tx(TxOut::NULL);
+    tmpl.tx.version = transaction::Version(version);
+    tmpl.tx.input[0].sequence = bitcoin::Sequence(sequence);
+    let script = ScriptBuf::builder().push_int(operand).push_opcode(OP_CSV).into_script().into_bytes();
+    run(ExecCtx::Legacy, tmpl, script, vec![]).error
+}
+
+#[test]
+fn csv_compares_like_core() {
+    const TIME: u32 = 1 << 22;
+    assert_eq!(csv(2, 10, 10), None);
+    assert_eq!(csv(2, 10, 11), Some(ExecError::UnsatisfiedLocktime));
+    // blocks against time and back
+    assert_eq!(csv(2, 10, i64::from(TIME | 5)), Some(ExecError::UnsatisfiedLocktime));
+    assert_eq!(csv(2, TIME | 10, 5), Some(ExecError::UnsatisfiedLocktime));
+    assert_eq!(csv(2, TIME | 10, i64::from(TIME | 10)), None);
+    // only the type flag and the low 16 bits of the operand count, even past 32 bits
+    assert_eq!(csv(2, 10, (1 << 32) | (1 << 20) | 5), None);
+    // the operand's disable flag makes CSV a NOP, the input's makes it fail
+    assert_eq!(csv(1, 0, 1 << 31), None);
+    assert_eq!(csv(2, (1 << 31) | 10, 5), Some(ExecError::UnsatisfiedLocktime));
+    assert_eq!(csv(1, 10, 5), Some(ExecError::UnsatisfiedLocktime));
+}
+
+#[test]
+fn csv_reads_the_tx_version_unsigned() {
+    // Core's version is a uint32: 0xffffffff is >= 2 and enables BIP68
+    assert_eq!(csv(-1, 10, 5), None);
 }
 
 #[test]

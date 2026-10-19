@@ -65,9 +65,8 @@ impl Exec {
                     return Err(ExecError::NegativeLocktime);
                 }
 
-                //TODO(stevenroose) check this logic
-                //TODO(stevenroose) check if this cast is ok
-                if n & SEQUENCE_LOCKTIME_DISABLE_FLAG as i64 == 0 && !self.check_sequence(n) {
+                // with the disable flag set CSV is a NOP (room for soft forks), as in Core
+                if n & i64::from(SEQUENCE_LOCKTIME_DISABLE_FLAG) == 0 && !self.check_sequence(n) {
                     return Err(ExecError::UnsatisfiedLocktime);
                 }
             }

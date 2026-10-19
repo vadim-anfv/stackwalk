@@ -13,14 +13,14 @@
 //! size limit; DISCOURAGE_UPGRADABLE_NOPS. FindAndDelete as Core's (the push-encoded signature
 //! at opcode boundaries, an empty one too); the stack limit checked after data pushes too; the
 //! legacy sighash hashes the script code without OP_CODESEPARATORs; the segwit v0 sighash
-//! commits to the raw hashtype byte. parse.rs: OP_PUSHDATA1 is a known name (was "_PUSHDATA1").
+//! commits to the raw hashtype byte; CSV reads the tx version unsigned. parse.rs: OP_PUSHDATA1 is a known name (was "_PUSHDATA1").
 
 use bitcoin::consensus::Encodable;
 use bitcoin::opcodes::{Opcode, all::*};
 use bitcoin::script::{self, Instruction, Instructions, Script, ScriptBuf};
 use bitcoin::sighash::SighashCache;
 use bitcoin::taproot::{self, TapLeafHash};
-use bitcoin::transaction::{self, Transaction, TxOut};
+use bitcoin::transaction::{Transaction, TxOut};
 
 mod ops;
 
@@ -360,8 +360,8 @@ impl Exec {
         use bitcoin::locktime::relative::LockTime;
 
         // Fail if the transaction's version number is not set high
-        // enough to trigger BIP 68 rules.
-        if self.tx.tx.version < transaction::Version::TWO {
+        // enough to trigger BIP 68 rules. Core's version is unsigned, rust-bitcoin's is an i32.
+        if (self.tx.tx.version.0 as u32) < 2 {
             return false;
         }
 
