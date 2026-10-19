@@ -912,6 +912,7 @@ const KEYS = {
   End: () => go(last()),
   ' ': () => (hidden() ? reveal() : next()),
   p: () => {
+    if (!FLAGS.predict) return;
     state.predict = !state.predict;
     render();
   },

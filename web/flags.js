@@ -8,6 +8,7 @@ export const FLAGS = {
   leaderboard: true, // train: leaderboard panel (needs a backend for real)
   // /flag:train
   altStack: true, // explore: alt stack column + scenarios that use it
+  predict: false, // explore: hide each new stack until revealed (a quiz with no answer to check; back with train)
 };
 
 export function applyFlags() {

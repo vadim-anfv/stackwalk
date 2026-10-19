@@ -184,6 +184,7 @@ body:not(.ff-train) .views,
 body:not(.ff-leaderboard) .flag-leaderboard { display: none !important; }
 /* /flag:train */
 body:not(.ff-altStack) .flag-altStack { display: none !important; }
+body:not(.ff-predict) .flag-predict { display: none !important; }
 /* a view switch with one view left (the build cut the others) is no switch */
 .views:not(:has(> :nth-child(2))) { display: none; }
 

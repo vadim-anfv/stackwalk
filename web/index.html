@@ -32,7 +32,7 @@
       <div class="toggles" id="toggles">
         <label class="toggle" title="Allow named test keys (A, B…) instead of real public keys. Signatures are symbolic; Bitcoin Core would reject such a descriptor."><input type="checkbox" id="keys-toggle"> test keys <kbd>K</kbd></label>
         <label class="toggle flag-altStack" title="Show the alt stack. When off, scripts using OP_TOALTSTACK / OP_FROMALTSTACK are refused."><input type="checkbox" id="alt-toggle"> alt stack <kbd>A</kbd></label>
-        <label class="toggle" title="Quiz yourself: after each step the new stack is hidden until you reveal it (Space)."><input type="checkbox" id="predict"> predict <kbd>P</kbd></label>
+        <label class="toggle flag-predict" title="Quiz yourself: after each step the new stack is hidden until you reveal it (Space)."><input type="checkbox" id="predict"> predict <kbd>P</kbd></label>
       </div>
     </div>
     <button id="theme" class="theme"></button>
@@ -53,7 +53,7 @@
           <dt><kbd>→</kbd> <kbd>l</kbd></dt><dd>next step</dd>
           <dt><kbd>←</kbd> <kbd>h</kbd></dt><dd>previous step</dd>
           <dt><kbd>Home</kbd> <kbd>End</kbd></dt><dd>first / last step</dd>
-          <dt><kbd>Space</kbd></dt><dd>next step, or reveal the stack in predict</dd>
+          <dt><kbd>Space</kbd></dt><dd>next step<span class="flag-predict">, or reveal the stack in predict</span></dd>
           <dt><kbd>N</kbd></dt><dd>next spend path (after the last, the first)</dd>
           <dt><kbd>E</kbd></dt><dd>edit the source: the first field with text</dd>
           <dt><kbd>Enter</kbd></dt><dd>in a source field: compile and leave it</dd>
@@ -62,7 +62,7 @@
           <dt><kbd>D</kbd> <kbd>S</kbd></dt><dd>descriptor / script mode</dd>
           <dt><kbd>K</kbd></dt><dd>test keys on / off</dd>
           <dt class="flag-altStack"><kbd>A</kbd></dt><dd class="flag-altStack">alt stack on / off</dd>
-          <dt><kbd>P</kbd></dt><dd>predict on / off</dd>
+          <dt class="flag-predict"><kbd>P</kbd></dt><dd class="flag-predict">predict on / off</dd>
           <dt><kbd>?</kbd></dt><dd>this list</dd>
         </dl>
       </section>
