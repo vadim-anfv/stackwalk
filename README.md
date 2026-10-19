@@ -2,6 +2,8 @@
 
 Step through Bitcoin Script with the stack drawn at every opcode. Write a policy, miniscript or descriptor (or raw Script), pick a spend path, walk the run.
 
+![stackwalk: a policy compiled to miniscript and P2WSH, its spend paths, and OP_CHECKSIG in the middle of a run](docs/screenshot.png)
+
 Live at [vadim.rs/stackwalk](https://vadim.rs/stackwalk) (soon).
 
 **Experimental, for learning.** The interpreter is not Bitcoin Core's and is not checked against it yet. Don't rely on it for real funds. It never needs private keys: don't paste them.
