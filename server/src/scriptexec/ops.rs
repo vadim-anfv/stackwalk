@@ -74,7 +74,10 @@ impl Exec {
             OP_CSV => {} // otherwise nop
 
             OP_NOP1 | OP_NOP4 | OP_NOP5 | OP_NOP6 | OP_NOP7 | OP_NOP8 | OP_NOP9 | OP_NOP10 => {
-                // nops
+                // reserved for soft forks: policy refuses them so a fork cannot make a relayed tx invalid
+                if self.opt.verify_discourage_upgradable_nops {
+                    return Err(ExecError::DiscourageUpgradableNops);
+                }
             }
 
             OP_IF | OP_NOTIF => {

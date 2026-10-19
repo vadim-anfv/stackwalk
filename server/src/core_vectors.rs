@@ -39,6 +39,7 @@ const SUPPORTED: &[&str] = &[
     "STRICTENC",
     "DERSIG",
     "LOW_S",
+    "DISCOURAGE_UPGRADABLE_NOPS",
     "DISCOURAGE_UPGRADABLE_WITNESS_PROGRAM",
 ];
 
@@ -160,6 +161,7 @@ impl Flags {
             verify_dersig: self.has("DERSIG"),
             verify_low_s: self.has("LOW_S"),
             verify_strictenc: self.has("STRICTENC"),
+            verify_discourage_upgradable_nops: self.has("DISCOURAGE_UPGRADABLE_NOPS"),
         }
     }
 }
@@ -194,6 +196,7 @@ fn core_err(e: &ExecError, op: Option<Opcode>, ctx: ExecCtx) -> &'static str {
         SigDer => "SIG_DER",
         SigHighS => "SIG_HIGH_S",
         SigHashtype => "SIG_HASHTYPE",
+        DiscourageUpgradableNops => "DISCOURAGE_UPGRADABLE_NOPS",
         SigCount => "SIG_COUNT",
         NullFail => "NULLFAIL",
         NullDummy => "SIG_NULLDUMMY",

@@ -10,7 +10,7 @@
 //! S normalized, as Core verifies them; WITNESS_PUBKEYTYPE an option, checked as Core does
 //! (compressed = 33 bytes with an 02 / 03 prefix, not just "not 65 bytes"); DERSIG, LOW_S and
 //! STRICTENC added (Core's CheckSignatureEncoding / CheckPubKeyEncoding); the 10000-byte script
-//! size limit.
+//! size limit; DISCOURAGE_UPGRADABLE_NOPS.
 
 use std::borrow::Cow;
 
@@ -90,6 +90,8 @@ pub struct Options {
     pub verify_low_s: bool,
     /// Defined hashtypes, well-formed public keys, strict DER (STRICTENC, policy).
     pub verify_strictenc: bool,
+    /// OP_NOP1, OP_NOP4..OP_NOP10 fail (DISCOURAGE_UPGRADABLE_NOPS, policy).
+    pub verify_discourage_upgradable_nops: bool,
 }
 
 impl Default for Options {
@@ -106,6 +108,7 @@ impl Default for Options {
             verify_dersig: true,
             verify_low_s: true,
             verify_strictenc: true,
+            verify_discourage_upgradable_nops: true,
         }
     }
 }

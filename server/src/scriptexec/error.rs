@@ -33,6 +33,7 @@ pub enum ExecError {
     SigDer,
     SigHighS,
     SigHashtype,
+    DiscourageUpgradableNops,
 
     SigCount,
     NullFail,

@@ -97,6 +97,9 @@ fn err_text(e: &ExecError, op: Option<Opcode>) -> String {
         SigDer => "signature is not strict DER (DERSIG)".into(),
         SigHighS => format!("signature has a high S value (LOW_S, {POLICY})"),
         SigHashtype => format!("undefined sighash type (STRICTENC, {POLICY})"),
+        DiscourageUpgradableNops => {
+            format!("NOP reserved for future soft forks (DISCOURAGE_UPGRADABLE_NOPS, {POLICY})")
+        }
         OpCount => "too many opcodes".into(),
         StackSize => "stack too large".into(),
         ScriptSize => "script larger than 10000 bytes".into(),
