@@ -568,11 +568,6 @@ textarea.src-input { display: block; resize: none; overflow: hidden; overflow-wr
   main.explore .well { height: calc(max(var(--rows, 4), 9) * 39px + 20px); }
   main.explore { --pad: 8px; }
   main.explore .run-frame { display: block; grid-area: 1 / 2 / 4 / 4; }
-  /* script and stack stand on the frame's bottom edge: one line there, not two */
-  /* (1px up: the frame's own border is the line; the outer corners follow its curve) */
-  main.explore .left .grow, main.explore .stacks { margin-bottom: 1px; max-height: calc(100% - 1px); align-self: stretch; border-bottom: 0; border-bottom-left-radius: 0; border-bottom-right-radius: 0; }
-  main.explore .left .grow { border-bottom-left-radius: calc(14px - var(--pad)); }
-  main.explore .stacks { border-bottom-right-radius: calc(14px - var(--pad)); }
 }
 
 /* touch screens: no keyboard, so header hotkey hints only take room */
