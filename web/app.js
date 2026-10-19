@@ -880,6 +880,11 @@ window.addEventListener('hashchange', () => {
 });
 
 initTheme();
+// the version (the server's, from Cargo.toml) in the footer and the help
+fetch('api/ping')
+  .then((r) => r.json())
+  .then((p) => document.querySelectorAll('.app-version').forEach((el) => (el.textContent = ` ${p.version}`)))
+  .catch(() => {}); // no backend: no version, the page says so elsewhere
 setSrcFold(loadPref('srcFold', 'on') === 'on');
 load(); // empty first, so there is something to draw while the backend answers
 // a link opens its view; else start on a wsh example (the output type the policy / miniscript fields are made for)

@@ -123,3 +123,10 @@ async fn metrics_are_not_on_the_public_router() {
     let (status, _) = get_text(router(Limits::default(), Arc::default()), "/metrics").await;
     assert_eq!(status, StatusCode::NOT_FOUND);
 }
+
+#[tokio::test]
+async fn ping_says_the_version() {
+    let (status, text) = get_text(router(Limits::default(), Arc::default()), "/api/ping").await;
+    assert_eq!(status, StatusCode::OK);
+    assert!(text.contains(&format!("\"version\":\"{}\"", env!("CARGO_PKG_VERSION"))), "{text}");
+}

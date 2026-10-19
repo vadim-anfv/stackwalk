@@ -115,8 +115,9 @@ fn log_line(req: &CompileReq, status: StatusCode, took: Duration, paths: Option<
     line
 }
 
+/// Alive, and which version: the page shows it in the footer.
 async fn ping() -> Json<serde_json::Value> {
-    Json(json!({ "ok": true }))
+    Json(json!({ "ok": true, "version": env!("CARGO_PKG_VERSION") }))
 }
 
 pub fn router(limits: Limits, metrics: Arc<Metrics>) -> Router {
