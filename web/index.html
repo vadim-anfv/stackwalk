@@ -54,6 +54,7 @@
           <dt><kbd>←</kbd> <kbd>h</kbd></dt><dd>previous step</dd>
           <dt><kbd>Home</kbd> <kbd>End</kbd></dt><dd>first / last step</dd>
           <dt><kbd>Space</kbd></dt><dd>next step, or reveal the stack in predict</dd>
+          <dt><kbd>N</kbd></dt><dd>next spend path (after the last, the first)</dd>
           <dt><kbd>E</kbd></dt><dd>edit the source: the first field with text</dd>
           <dt><kbd>Enter</kbd></dt><dd>in a source field: compile and leave it</dd>
           <dt><kbd>Shift</kbd>+<kbd>Enter</kbd></dt><dd>in a source field: new line</dd>
@@ -176,7 +177,7 @@
       <!-- desktop only: the spend paths with their cost (a row click runs that path; the
            phone picks it in the source instead), then the input as sent and the limits for it -->
       <div class="panel cost-panel">
-        <h2>spend paths</h2>
+        <h2>spend paths <kbd title="Next spend path (N)">N</kbd></h2>
         <table id="cost" class="cost"></table>
       </div>
       <div class="panel spend-panel">

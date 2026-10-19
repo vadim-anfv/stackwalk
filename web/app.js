@@ -645,6 +645,15 @@ $('cost').onclick = (e) => {
   load();
 };
 
+// N: the next spend path, after the last one the first again
+function nextPath() {
+  const n = $('paths').options.length;
+  if (n < 2 || state.blocked) return;
+  state.path = (state.path + 1) % n;
+  $('paths').value = String(state.path);
+  load();
+}
+
 $('paths').onchange = (e) => {
   state.path = Number(e.target.value);
   e.target.blur();
@@ -912,6 +921,7 @@ const KEYS = {
   d: () => setMode('miniscript'), // the "descriptor" mode: policy -> miniscript -> descriptor
   s: () => setMode('script'),
   e: editSource,
+  n: nextPath,
 };
 
 // E: the cursor into the first source field of the mode that has text (policy is

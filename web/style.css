@@ -233,7 +233,7 @@ body:not([data-mode='script']) .script-only-field { display: none; }
 
 .src-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 8px; }
 .src-head h2 { margin: 0; white-space: nowrap; }
-.src-head h2 kbd { font-weight: 400; letter-spacing: 0; margin-left: 4px; }
+.src-head h2 kbd, .cost-panel h2 kbd { font-weight: 400; letter-spacing: 0; margin-left: 4px; }
 /* minmax(0, 1fr): a long unbreakable value (a hex key) must wrap, not widen the panel */
 .field { display: grid; grid-template-columns: var(--lw) minmax(0, 1fr); gap: 8px; align-items: center; }
 /* source field names: near the size of the values, readable on the dark panel */
