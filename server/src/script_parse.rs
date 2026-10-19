@@ -13,6 +13,12 @@ fn call<'a>(s: &'a str, f: &str) -> Option<&'a str> {
     s.strip_prefix(f)?.strip_prefix('(')?.strip_suffix(')')
 }
 
+/// As Core's ParseScript: a decimal number within +-0xffffffff (i64::MIN made push_int panic).
+fn bounded(n: i64) -> Result<i64, String> {
+    const MAX: i64 = 0xffff_ffff;
+    if (-MAX..=MAX).contains(&n) { Ok(n) } else { Err(format!("number out of range: {n} (max +-{MAX})")) }
+}
+
 fn hexbytes(s: &str) -> Option<Vec<u8>> {
     if !s.len().is_multiple_of(2) || !s.chars().all(|c| c.is_ascii_hexdigit()) {
         return None;
@@ -26,7 +32,7 @@ pub fn parse(ring: &mut KeyRing, text: &str) -> Result<ScriptBuf, String> {
     for (i, tok) in toks.iter().enumerate() {
         if let Some(inner) = tok.strip_prefix('<').and_then(|t| t.strip_suffix('>')) {
             let bytes: Vec<u8> = if let Ok(n) = inner.parse::<i64>() {
-                b = b.push_int(n);
+                b = b.push_int(bounded(n)?);
                 continue;
             } else if let Some(n) = call(inner, "pk") {
                 ring.pubkey(n).to_bytes()
@@ -58,7 +64,7 @@ pub fn parse(ring: &mut KeyRing, text: &str) -> Result<ScriptBuf, String> {
                 _ => b.push_slice(PushBytesBuf::try_from(bytes).map_err(|_| format!("push too large: {tok}"))?),
             };
         } else if let Ok(n) = tok.parse::<i64>() {
-            b = b.push_int(n);
+            b = b.push_int(bounded(n)?);
         } else {
             let op = parse_opcode(tok).map_err(|_| format!("unknown opcode {tok}"))?;
             b = b.push_opcode(op);

@@ -336,6 +336,17 @@ fn small_pushes_are_written_as_the_minimal_opcodes() {
 }
 
 #[test]
+fn script_numbers_are_bounded_as_core_parses_them() {
+    // i64::MIN panicked inside rust-bitcoin's push_int; Core's ParseScript takes +-0xffffffff
+    for text in ["-9223372036854775808", "<-9223372036854775808>", "4294967296", "<-4294967296>"] {
+        let err = run("script", text, None).unwrap_err();
+        assert!(err.contains("out of range"), "{text}: {err}");
+    }
+    assert!(run("script", "4294967295 OP_DROP OP_1", None).is_ok());
+    assert!(run("script", "<-4294967295> OP_DROP OP_1", None).is_ok());
+}
+
+#[test]
 fn a_bad_key_with_wide_characters_is_an_error_not_a_crash() {
     // shortening the key for the message cut it inside a character
     let err = run("policy", "pk([ééééééééééééééééééééé])", None).unwrap_err();
