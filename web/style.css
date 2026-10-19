@@ -275,7 +275,7 @@ textarea.src-input { display: block; resize: none; overflow: hidden; overflow-wr
 .src-input.invalid { border-color: var(--fail); }
 .src-msg { font-size: 12px; margin: 4px 0; padding-left: 88px; }
 .src-msg:empty { display: none; }
-.src-sep { border: 0; border-top: 1px solid var(--line); margin: 10px 0; }
+.src-sep { height: 1px; background: var(--line); margin: 10px 0; }
 .src-msg.warn { color: var(--fail); }
 .src-msg.ok { color: var(--ok); }
 .src-msg.busy { color: var(--muted); }
