@@ -6,7 +6,7 @@ Step through Bitcoin Script with the stack drawn at every opcode. Write a policy
 
 Live at [vadim.rs/stackwalk](https://vadim.rs/stackwalk) (soon).
 
-**Experimental, for learning.** The interpreter is not Bitcoin Core's and is not checked against it yet. Don't rely on it for real funds. It never needs private keys: don't paste them.
+**Experimental, for learning.** The interpreter is not Bitcoin Core's. It passes all 1217 legacy and segwit v0 vectors of Core's `script_tests.json` (v31.1); taproot is not covered. Don't rely on it for real funds. It never needs private keys: don't paste them.
 
 ## Run
 
