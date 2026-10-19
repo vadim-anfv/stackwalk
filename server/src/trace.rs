@@ -98,7 +98,6 @@ fn err_text(e: &ExecError, op: Option<Opcode>) -> String {
         StackSize => "stack too large".into(),
         PushSize => "push too large".into(),
         ScriptIntNumericOverflow => "number out of range".into(),
-        OpCodeseparator => "OP_CODESEPARATOR is not allowed here".into(),
         PubkeyType => "not a valid public key".into(),
         TapscriptValidationWeight | SchnorrSigSize | SchnorrSigHashtype | SchnorrSig | TapscriptCheckMultiSig => {
             "a taproot rule failed (taproot is not supported yet)".into()
@@ -115,7 +114,6 @@ fn parse_error_text(e: &crate::scriptexec::Error) -> String {
         Error::InvalidScript(Script::NonMinimalPush) => format!("a push not in its shortest form (MINIMALDATA, {POLICY})"),
         Error::InvalidScript(Script::NumericOverflow) => "a number in the script is out of range".into(),
         Error::InvalidScript(_) => "the script does not parse".into(),
-        Error::Exec(e) => err_text(e, None),
         Error::Other(msg) => (*msg).into(),
     }
 }

@@ -1,23 +1,9 @@
 use bitcoin::opcodes::{all::*, OP_0, OP_FALSE, OP_NOP2, OP_NOP3, OP_TRUE};
 use bitcoin::Opcode;
 
-/// Parses a string into a Bitcoin script opcode
-///
-/// Accepts both the full opcode name (e.g. "OP_CHECKSIG") and the shorter version without the "OP_" prefix
-/// (e.g. "CHECKSIG")
-///
-/// # Examples
-///
-/// ```
-/// use bitcoin::opcodes::all::*;
-/// # use bitcoin_scriptexec::parse_opcode;
-///
-/// assert_eq!(parse_opcode("OP_CHECKSIG").unwrap(), OP_CHECKSIG);
-/// assert_eq!(parse_opcode("CHECKSIG").unwrap(), OP_CHECKSIG);
-/// assert_eq!(parse_opcode("OP_1").unwrap(), OP_PUSHNUM_1);
-/// assert!(parse_opcode("INVALID").is_err());
-/// ```
-/// Parses a string into a Bitcoin script [`Opcode`].
+/// Parses a string into a Bitcoin script [`Opcode`]: the full name (`OP_CHECKSIG`) or the
+/// name without the `OP_` prefix (`CHECKSIG`). Small numbers only with the prefix: `OP_1`
+/// is OP_PUSHNUM_1, `1` is an error.
 pub fn parse_opcode(s: &str) -> Result<Opcode, ()> {
     match s {
         // Special cases with aliases

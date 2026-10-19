@@ -1,11 +1,13 @@
 //! Vendored from https://github.com/BitVM/rust-bitcoin-scriptexec (rev ba96bc2bd7),
 //! license CC0-1.0. Local changes: stack entries carry ids (moves keep them, copies
 //! get new ones), OP_CHECKMULTISIG(VERIFY) implemented, NULLFAIL / NULLDUMMY added,
-//! FindAndDelete bounds fixed, signature checks recorded for notes, wasm/json/cli dropped.
-#![allow(dead_code)]
+//! FindAndDelete bounds fixed, signature checks recorded for notes, opcode count exposed,
+//! wasm/json/cli dropped. As in Core: PICK / ROLL pop n before checking it, CSV masks its
+//! operand, MINIMALDATA only on executed pushes, OP_RESERVED fails only when executed, the
+//! script code starts after OP_CODESEPARATOR, OP_CAT is disabled (the experimental OP_CAT
+//! is gone). Execution stats and other unused API removed.
 
 use std::borrow::Cow;
-use std::cmp;
 
 use bitcoin::consensus::Encodable;
 use bitcoin::opcodes::{Opcode, all::*};
@@ -39,9 +41,6 @@ const MAX_SCRIPT_ELEMENT_SIZE: usize = 520;
 /// Maximum number of values on script interpreter stack
 const MAX_STACK_SIZE: usize = 1000;
 
-/// The default maximum size of scriptints.
-const DEFAULT_MAX_SCRIPTINT_SIZE: usize = 4;
-
 /// If this flag is set, CTxIn::nSequence is NOT interpreted as a
 /// relative lock-time.
 /// It skips SequenceLocks() for any input that has it set (BIP 68).
@@ -57,13 +56,6 @@ const VALIDATION_WEIGHT_PER_SIGOP_PASSED: i64 = 50;
 
 // Maximum number of public keys per multisig
 const MAX_PUBKEYS_PER_MULTISIG: i64 = 20;
-
-/// Used to enable experimental script features.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Experimental {
-    /// Enable an experimental implementation of OP_CAT.
-    pub op_cat: bool,
-}
 
 /// Used to fine-tune different variables during execution.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -82,8 +74,6 @@ pub struct Options {
     pub verify_nullfail: bool,
     /// The CHECKMULTISIG dummy element must be empty (BIP147 NULLDUMMY).
     pub verify_nulldummy: bool,
-
-    pub experimental: Experimental,
 }
 
 impl Default for Options {
@@ -96,7 +86,6 @@ impl Default for Options {
             enforce_stack_limit: true,
             verify_nullfail: true,
             verify_nulldummy: true,
-            experimental: Experimental { op_cat: true },
         }
     }
 }
@@ -157,22 +146,6 @@ impl ExecutionResult {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Default)]
-pub struct ExecStats {
-    /// The highest number of stack items occurred during execution.
-    /// This counts both the stack and the altstack.
-    pub max_nb_stack_items: usize,
-
-    /// The number of opcodes executed, plus an additional one
-    /// per signature in CHECKMULTISIG.
-    pub opcode_count: usize,
-
-    /// The validation weight execution started with.
-    pub start_validation_weight: i64,
-    /// The current remaining validation weight.
-    pub validation_weight: i64,
-}
-
 /// Partial execution of a script.
 pub struct Exec {
     ctx: ExecCtx,
@@ -194,9 +167,6 @@ pub struct Exec {
 
     opcode_count: usize,
     validation_weight: i64,
-
-    // runtime statistics
-    stats: ExecStats,
 
     /// Signature checks done by the last executed opcode.
     pub last_checks: Vec<SigCheck>,
@@ -254,9 +224,9 @@ impl Exec {
         //TODO(stevenroose) make this more efficient
         let witness_size =
             Encodable::consensus_encode(&script_witness, &mut bitcoin::io::sink()).unwrap();
-        let start_validation_weight = VALIDATION_WEIGHT_OFFSET + witness_size as i64;
+        let validation_weight = VALIDATION_WEIGHT_OFFSET + witness_size as i64;
 
-        let mut ret = Exec {
+        Ok(Exec {
             ctx,
             result: None,
 
@@ -269,38 +239,21 @@ impl Exec {
             stack,
             last_checks: Vec::new(),
             opcode_count: 0,
-            validation_weight: start_validation_weight,
+            validation_weight,
             last_codeseparator_pos: None,
             script_code: script,
 
             opt,
             tx,
-
-            stats: ExecStats {
-                start_validation_weight,
-                validation_weight: start_validation_weight,
-                ..Default::default()
-            },
-        };
-        ret.update_stats();
-        Ok(ret)
+        })
     }
 
     //////////////////
     // SOME GETTERS //
     //////////////////
 
-    pub fn result(&self) -> Option<&ExecutionResult> {
-        self.result.as_ref()
-    }
-
     pub fn script_position(&self) -> usize {
         self.script.len() - self.instructions.as_script().len()
-    }
-
-    pub fn remaining_script(&self) -> &Script {
-        let pos = self.script_position();
-        &self.script[pos..]
     }
 
     pub fn stack(&self) -> &Stack {
@@ -311,11 +264,7 @@ impl Exec {
         &self.altstack
     }
 
-    pub fn stats(&self) -> &ExecStats {
-        &self.stats
-    }
-
-    /// Opcodes counted so far (stackwalk): also after a failure, which skips `update_stats`.
+    /// Opcodes counted so far (stackwalk): also after a failure.
     pub fn opcode_count(&self) -> usize {
         self.opcode_count
     }
@@ -527,10 +476,7 @@ impl Exec {
                 }
 
                 match op {
-                    OP_CAT if !self.opt.experimental.op_cat || self.ctx != ExecCtx::Tapscript => {
-                        return self.failop(ExecError::DisabledOpcode, op);
-                    }
-                    OP_SUBSTR | OP_LEFT | OP_RIGHT | OP_INVERT | OP_AND | OP_OR | OP_XOR
+                    OP_CAT | OP_SUBSTR | OP_LEFT | OP_RIGHT | OP_INVERT | OP_AND | OP_OR | OP_XOR
                     | OP_2MUL | OP_2DIV | OP_MUL | OP_DIV | OP_MOD | OP_LSHIFT | OP_RSHIFT => {
                         return self.failop(ExecError::DisabledOpcode, op);
                     }
@@ -545,27 +491,13 @@ impl Exec {
             }
         }
 
-        self.update_stats();
         Ok(())
-    }
-
-    ////////////////
-    // STATISTICS //
-    ////////////////
-
-    fn update_stats(&mut self) {
-        let stack_items = self.stack.len() + self.altstack.len();
-        self.stats.max_nb_stack_items = cmp::max(self.stats.max_nb_stack_items, stack_items);
-
-        self.stats.opcode_count = self.opcode_count;
-        self.stats.validation_weight = self.validation_weight;
     }
 }
 
 /// Decodes an interger in script format with flexible size limit.
 ///
-/// Note that in the majority of cases, you will want to use either
-/// [`read_scriptint`] or [`read_scriptint_non_minimal`] instead.
+/// Note that in the majority of cases, you will want to use [`read_scriptint`] instead.
 ///
 /// Panics if max_size exceeds 8.
 pub fn read_scriptint_size(v: &[u8], max_size: usize, minimal: bool) -> Result<i64, script::Error> {
@@ -637,13 +569,4 @@ pub(crate) fn read_scriptint(item: &[u8], size: usize, minimal: bool) -> Result<
         // should never happen
         _ => unreachable!(),
     })
-}
-
-/// Decodes an integer in script format without non-minimal error.
-///
-/// The overflow error for slices over 4 bytes long is still there.
-/// See [`read_scriptint`] for a description of some subtleties of
-/// this function.
-pub fn read_scriptint_non_minimal(v: &[u8]) -> Result<i64, script::Error> {
-    read_scriptint_size(v, DEFAULT_MAX_SCRIPTINT_SIZE, false)
 }

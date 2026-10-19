@@ -6,7 +6,6 @@ use bitcoin::blockdata::script;
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ExecError {
     DisabledOpcode,
-    OpCodeseparator,
     BadOpcode,
     OpCount,
     PushSize,
@@ -42,7 +41,6 @@ pub enum ExecError {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Error {
-    Exec(ExecError),
     InvalidScript(script::Error),
     Other(&'static str),
 }

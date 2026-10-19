@@ -131,11 +131,6 @@ impl Stack {
         Ok(self.items.pop().ok_or(ExecError::InvalidStackOperation)?.data)
     }
 
-    pub fn popnum(&mut self, require_minimal: bool) -> Result<i64, ExecError> {
-        let e = self.items.pop().ok_or(ExecError::InvalidStackOperation)?;
-        read_scriptint(&e.data, 4, require_minimal)
-    }
-
     pub fn len(&self) -> usize {
         self.items.len()
     }

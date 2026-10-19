@@ -1,3 +1,5 @@
+use std::cmp;
+
 use bitcoin::hashes::{Hash, hash160, ripemd160, sha1, sha256, sha256d};
 
 use super::*;
@@ -295,18 +297,6 @@ impl Exec {
                 self.stack.push_copy(&x2);
                 self.stack.push(x1);
                 self.stack.push(x2);
-            }
-
-            OP_CAT if self.opt.experimental.op_cat && self.ctx == ExecCtx::Tapscript => {
-                // (x1 x2 -- x1|x2)
-                self.stack.needn(2)?;
-                let x2 = self.stack.popstr().unwrap();
-                let x1 = self.stack.popstr().unwrap();
-                let ret: Vec<u8> = x1.into_iter().chain(x2).collect();
-                if ret.len() > MAX_SCRIPT_ELEMENT_SIZE {
-                    return Err(ExecError::PushSize);
-                }
-                self.stack.pushstr(&ret);
             }
 
             OP_SIZE => {
