@@ -383,6 +383,17 @@ fn a_private_key_is_refused_and_not_repeated() {
 }
 
 #[test]
+fn an_answer_too_many_bytes_is_refused() {
+    // few items, each big: 200 copies of a 520-byte push stayed under the item limit and
+    // made a 22 MB answer from a 2.4 KB request
+    let script = format!("<0x{}>{}", "ab".repeat(520), " OP_DUP".repeat(200));
+    let err = run("script", &script, None).unwrap_err();
+    assert!(err.contains("too big to show"), "{err}");
+    // the biggest example stays well below
+    assert!(run("miniscript", "multi(2,A,B,C,D,E,F,G,H,I,J)", None).is_ok());
+}
+
+#[test]
 fn a_run_too_big_to_show_is_refused() {
     // every push grows the stack, and every step carries the whole stack: quadratic
     let script = vec!["OP_1"; 800].join(" ");

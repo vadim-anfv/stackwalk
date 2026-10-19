@@ -25,6 +25,10 @@ pub const MAX_POLICY_CONDITIONS: usize = 10;
 /// run of pushes grows the answer quadratically (800 pushes: 320 000 items, 18 MB).
 pub const MAX_TRACE_ITEMS: usize = 30_000;
 
+/// The answer as JSON: few but big items pass the item limit (200 copies of a 520-byte push
+/// made 22 MB from a 2.4 KB request). The largest example is far below.
+pub const MAX_ANSWER_BYTES: usize = 4 << 20;
+
 pub fn compile(req: &CompileReq) -> Result<Scenario, String> {
     // never echoed back, and never built into anything shown or linked
     if real_keys::has_private_key(&req.text) {
@@ -77,6 +81,22 @@ fn check_size(sc: &Scenario) -> Result<(), String> {
     let items: usize = sc.traces.iter().flat_map(|t| &t.steps).map(|s| s.stack.len() + s.alt.len()).sum();
     if items > MAX_TRACE_ITEMS {
         return Err(format!("the run is too big to show: {items} stack items over all its steps (max {MAX_TRACE_ITEMS})"));
+    }
+    // counted while serializing, nothing kept
+    struct Count(usize);
+    impl std::io::Write for Count {
+        fn write(&mut self, b: &[u8]) -> std::io::Result<usize> {
+            self.0 += b.len();
+            Ok(b.len())
+        }
+        fn flush(&mut self) -> std::io::Result<()> {
+            Ok(())
+        }
+    }
+    let mut n = Count(0);
+    serde_json::to_writer(&mut n, sc).map_err(|e| format!("internal: {e}"))?;
+    if n.0 > MAX_ANSWER_BYTES {
+        return Err(format!("the run is too big to show: {} MB as JSON (max {} MB)", n.0 >> 20, MAX_ANSWER_BYTES >> 20));
     }
     Ok(())
 }

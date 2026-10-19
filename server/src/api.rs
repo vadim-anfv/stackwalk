@@ -4,7 +4,7 @@
 //!
 //! `POST /api/compile` answers 200 with a `Scenario`, or `{"error": "..."}` with:
 //! - 400: parse / compile errors, taproot, a body that is not JSON, and the size limits of
-//!   `scenario.rs` / `paths.rs` (policy conditions, spend paths, stack items in the answer);
+//!   `scenario.rs` / `paths.rs` (policy conditions, spend paths, stack items and bytes in the answer);
 //! - 422: JSON that is not a request: a field missing, an unknown kind or wrap;
 //! - 413: source text or body over `Limits`; 415: not `Content-Type: application/json`;
 //! - 503: over `Limits::time`, waiting for a slot included; 500: the compile panicked.
