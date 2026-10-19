@@ -94,7 +94,7 @@ fn initial_stack_names_its_source() {
     assert_eq!(first(ok("policy", "pk(A)", Some("wpkh"))), "Initial stack = witness: [sig(A), pk(A)]");
     assert_eq!(first(ok("policy", "pk(A)", Some("pkh"))), "Initial stack = scriptSig: [sig(A), pk(A)]");
     // a bare script has no transaction behind it, so no witness either
-    assert_eq!(first(ok("script", "OP_1", None)), "Initial stack: empty");
+    assert!(first(ok("script", "OP_1", None)).starts_with("Initial stack: empty."));
 }
 
 #[test]
@@ -247,6 +247,18 @@ fn too_many_spend_paths_are_refused() {
     assert!(err.contains("too many spend paths"), "{err}");
     // 2 of 10: 45
     assert!(run("miniscript", "multi(2,A,B,C,D,E,F,G,H,I,J)", None).is_ok());
+}
+
+#[test]
+fn a_script_that_is_not_miniscript_says_why_its_stack_is_empty() {
+    // needs an input it cannot get: fails at once, and must not look like a bug
+    let sc = ok("script", "OP_IF OP_1 OP_ENDIF", None);
+    let start = sc.traces[0].steps[0].note.clone();
+    assert!(start.contains("not a miniscript"), "{start}");
+    assert!(sc.about.is_some_and(|a| a.contains("not a miniscript")));
+    // a recognized miniscript gets its witness, no such note
+    let sc = ok("script", "<pk(A)> OP_CHECKSIG", None);
+    assert!(!sc.traces[0].steps[0].note.contains("not a miniscript"));
 }
 
 #[test]

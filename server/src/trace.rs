@@ -124,9 +124,13 @@ pub enum Initial {
     Witness,
     /// P2WSH: the last witness item is the witnessScript, it is run, not pushed
     WitnessBody,
-    /// a bare script: no transaction, no spending data
+    /// a script that is not a miniscript: no witness to build for it
     Empty,
 }
+
+/// Why a raw script starts with nothing on the stack.
+pub const NO_WITNESS: &str =
+    "This script is not a miniscript, so there is no witness to build for it: if it reads its input, it fails at once.";
 
 impl Initial {
     fn note(self, labels: &[String]) -> String {
@@ -134,7 +138,7 @@ impl Initial {
             Self::ScriptSig => "scriptSig",
             Self::Witness => "witness",
             Self::WitnessBody => "witness without its last item (witnessScript)",
-            Self::Empty => return "Initial stack: empty".into(),
+            Self::Empty => return format!("Initial stack: empty. {NO_WITNESS}"),
         };
         format!("Initial stack = {src}: [{}]", labels.join(", "))
     }

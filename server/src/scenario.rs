@@ -14,7 +14,7 @@ use crate::sat::{Sat, SigCtx, dummy_tx};
 use crate::scriptexec::ExecCtx;
 use crate::script_parse;
 use crate::spend::{Field, spend_data};
-use crate::trace::{Initial, Runner, ins_list, script_text};
+use crate::trace::{Initial, NO_WITNESS, Runner, ins_list, script_text};
 use crate::tree;
 
 /// Keys, hashes and timelocks in a policy. The compiler is exponential in the size of an
@@ -527,7 +527,7 @@ fn build_raw(ring: &mut KeyRing, script_buf: ScriptBuf) -> Scenario {
         outside_bip379: false,
         keys: Vec::new(),
         spk: script_text(ring, &spk),
-        about: None,
+        about: Some(NO_WITNESS.into()),
         tree: None,
         script,
         script_bytes: script_buf.len(),
