@@ -5,7 +5,9 @@
 //! wasm/json/cli dropped. As in Core: PICK / ROLL pop n before checking it, CSV masks its
 //! operand, MINIMALDATA only on executed pushes, OP_RESERVED fails only when executed, the
 //! script code starts after OP_CODESEPARATOR, OP_CAT is disabled (the experimental OP_CAT
-//! is gone). Execution stats and other unused API removed.
+//! is gone). Execution stats and other unused API removed. Checked against Core's
+//! script_tests.json (src/core_vectors.rs), which led to: ECDSA signatures parsed lax DER with
+//! S normalized, as Core verifies them.
 
 use std::borrow::Cow;
 

@@ -20,17 +20,6 @@ use crate::scriptexec::{Entry, Exec, ExecCtx, ExecError, IdGen, Options, Stack, 
 
 /// Vectors we knowingly disagree with: (index in the JSON array, why). Prefer fixing.
 const KNOWN_GAPS: &[(usize, &str)] = &[
-    // ECDSA: Core parses signatures laxly and normalizes S before verifying, we parse strict DER
-    (1043, "P2PK with too much R padding but no DERSIG"),
-    (1045, "P2PK with too much S padding but no DERSIG"),
-    (1047, "P2PK with too little R padding but no DERSIG"),
-    (1051, "P2PK NOT with too much R padding but no DERSIG"),
-    (1053, "BIP66 example 1, without DERSIG"),
-    (1055, "BIP66 example 2, without DERSIG"),
-    (1068, "BIP66 example 7, without DERSIG"),
-    (1070, "BIP66 example 8, without DERSIG"),
-    (1080, "P2PK with multi-byte hashtype, without DERSIG"),
-    (1082, "P2PK with high S but no LOW_S"),
     // uncompressed keys in segwit v0 are a policy flag (WITNESS_PUBKEYTYPE), we always refuse them
     (1116, "Basic P2WSH"),
     (1117, "Basic P2WPKH"),

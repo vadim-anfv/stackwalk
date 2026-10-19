@@ -21,10 +21,12 @@ impl Exec {
         }
 
         let hashtype = *sig.last().unwrap();
-        let sig = match secp256k1::ecdsa::Signature::from_der(&sig[0..sig.len() - 1]) {
+        // as Core's CPubKey::Verify: lax DER (strict DER is the DERSIG flag) and any S (LOW_S is a flag)
+        let mut sig = match secp256k1::ecdsa::Signature::from_der_lax(&sig[0..sig.len() - 1]) {
             Ok(s) => s,
             Err(_) => return false,
         };
+        sig.normalize_s();
 
         let sighash = if self.ctx == ExecCtx::SegwitV0 {
             self.sighashcache
