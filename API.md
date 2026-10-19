@@ -1,6 +1,6 @@
 # stackwalk API (UI <-> backend)
 
-The Rust server (`server/`) serves both the page and `/api/*` on one origin, by default `127.0.0.1:5173` (`BIND` sets the addresses). Debug builds serve `web/` from disk with live reload; release builds serve the deploy build of `web/` embedded in the binary (`server/build.rs`, `server/build/web.rs`: feature flags cut out, unreachable modules dropped), so a deploy is the one binary. Dev: `cd server && bacon`. JSON in, JSON out.
+The Rust server (`server/`) serves both the page and `/api/*` on one origin, by default `127.0.0.1:5173` (`BIND` sets the addresses). Debug builds serve `web/` from disk with live reload; release builds serve `web/` embedded in the binary (`server/build.rs`), so a deploy is the one binary. Dev: `cd server && bacon`. JSON in, JSON out.
 
 First iteration scope: test keys only (symbolic key names), policy / miniscript as `bare`, `sh`, `wsh` (default), `pkh` or `wpkh`, legacy and segwit v0 templates. No taproot.
 
