@@ -113,7 +113,7 @@ pub fn parse_opcode(s: &str) -> Result<Opcode, ()> {
                 "PUSHBYTES_75" => Ok(OP_PUSHBYTES_75),
 
                 // Regular opcodes
-                "_PUSHDATA1" => Ok(OP_PUSHDATA1),
+                "PUSHDATA1" => Ok(OP_PUSHDATA1),
                 "PUSHDATA2" => Ok(OP_PUSHDATA2),
                 "PUSHDATA4" => Ok(OP_PUSHDATA4),
                 "PUSHNUM_NEG1" => Ok(OP_PUSHNUM_NEG1),
@@ -336,6 +336,14 @@ mod tests {
         assert_eq!(parse_opcode("DUP").unwrap(), OP_DUP);
         assert_eq!(parse_opcode("DROP").unwrap(), OP_DROP);
         assert_eq!(parse_opcode("SWAP").unwrap(), OP_SWAP);
+    }
+
+    #[test]
+    fn test_pushdata() {
+        assert_eq!(parse_opcode("OP_PUSHDATA1").unwrap(), OP_PUSHDATA1);
+        assert_eq!(parse_opcode("PUSHDATA1").unwrap(), OP_PUSHDATA1);
+        assert_eq!(parse_opcode("OP_PUSHDATA2").unwrap(), OP_PUSHDATA2);
+        assert_eq!(parse_opcode("OP_PUSHDATA4").unwrap(), OP_PUSHDATA4);
     }
 
     #[test]

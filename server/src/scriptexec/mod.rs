@@ -13,7 +13,7 @@
 //! size limit; DISCOURAGE_UPGRADABLE_NOPS. FindAndDelete as Core's (the push-encoded signature
 //! at opcode boundaries, an empty one too); the stack limit checked after data pushes too; the
 //! legacy sighash hashes the script code without OP_CODESEPARATORs; the segwit v0 sighash
-//! commits to the raw hashtype byte.
+//! commits to the raw hashtype byte. parse.rs: OP_PUSHDATA1 is a known name (was "_PUSHDATA1").
 
 use bitcoin::consensus::Encodable;
 use bitcoin::opcodes::{Opcode, all::*};
