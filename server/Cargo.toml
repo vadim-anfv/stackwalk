@@ -2,6 +2,7 @@
 name = "stackwalk-server"
 version = "0.1.0"
 edition = "2024"
+rust-version = "1.88"
 license = "MIT OR Apache-2.0"
 publish = false
 
@@ -13,7 +14,7 @@ notify = "8.2.0"
 serde = { version = "1.0.229", features = ["derive"] }
 serde_json = "1.0.154"
 tokio = { version = "1.53.3", features = ["macros", "rt-multi-thread", "net"] }
-tower-http = { version = "0.7.1", features = ["fs", "set-header"] }
+tower-http = { version = "0.7.1", features = ["compression-gzip", "fs", "set-header"] }
 tower-livereload = "0.10.3"
 
 [dev-dependencies]

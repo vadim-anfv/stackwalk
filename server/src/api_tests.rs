@@ -20,6 +20,20 @@ async fn compile_json(limits: Limits, text: &str) -> (StatusCode, String) {
 }
 
 #[tokio::test]
+async fn answers_are_gzipped_when_asked() {
+    // the JSON is repetitive: 1.7 MB from a 1.6 KB request went out as is
+    let body = serde_json::json!({ "kind": "policy", "text": "or(pk(A),and(pk(B),older(144)))" }).to_string();
+    let req = Request::post("/api/compile")
+        .header(header::CONTENT_TYPE, "application/json")
+        .header(header::ACCEPT_ENCODING, "gzip")
+        .body(Body::from(body))
+        .unwrap();
+    let res = router(Limits::default(), Arc::default()).oneshot(req).await.unwrap();
+    assert_eq!(res.status(), StatusCode::OK);
+    assert_eq!(res.headers().get(header::CONTENT_ENCODING).map(|v| v.as_bytes()), Some(&b"gzip"[..]));
+}
+
+#[tokio::test]
 async fn compiles_a_policy() {
     let (status, body) = compile_json(Limits::default(), "pk(A)").await;
     assert_eq!(status, StatusCode::OK, "{body}");

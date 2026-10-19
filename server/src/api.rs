@@ -22,6 +22,7 @@ use axum::response::{IntoResponse, Json, Response};
 use axum::routing::{get, post};
 use serde_json::json;
 use tokio::sync::Semaphore;
+use tower_http::compression::CompressionLayer;
 use tower_http::set_header::SetResponseHeaderLayer;
 
 use crate::metrics::Metrics;
@@ -127,6 +128,8 @@ pub fn router(limits: Limits, metrics: Arc<Metrics>) -> Router {
         .route("/api/compile", post(compile))
         .route("/api/ping", get(ping))
         .layer(DefaultBodyLimit::max(limits.body))
+        // the answer is repetitive JSON, up to scenario::MAX_ANSWER_BYTES: about 10x smaller
+        .layer(CompressionLayer::new())
         .with_state(api)
 }
 
