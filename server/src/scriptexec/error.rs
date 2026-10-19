@@ -28,6 +28,7 @@ pub enum ExecError {
     TapscriptCheckMultiSig,
     PubkeyCount,
     StackSize,
+    ScriptSize,
     WitnessPubkeyType,
     SigDer,
     SigHighS,

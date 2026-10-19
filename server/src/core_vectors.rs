@@ -19,10 +19,7 @@ use serde_json::Value;
 use crate::scriptexec::{Entry, Exec, ExecCtx, ExecError, IdGen, Options, Stack, TxTemplate, parse_opcode, scriptint_vec};
 
 /// Vectors we knowingly disagree with: (index in the JSON array, why). Prefer fixing.
-const KNOWN_GAPS: &[(usize, &str)] = &[
-    // no 10000-byte script size limit yet
-    (833, "script size 10001 must fail SCRIPT_SIZE"),
-];
+const KNOWN_GAPS: &[(usize, &str)] = &[];
 
 /// Flags our engine or this harness implements; any other flag skips the vector.
 const SUPPORTED: &[&str] = &[
@@ -192,6 +189,7 @@ fn core_err(e: &ExecError, op: Option<Opcode>, ctx: ExecCtx) -> &'static str {
         CheckSigVerify => "CHECKSIGVERIFY",
         PubkeyCount => "PUBKEY_COUNT",
         StackSize => "STACK_SIZE",
+        ScriptSize => "SCRIPT_SIZE",
         WitnessPubkeyType => "WITNESS_PUBKEYTYPE",
         SigDer => "SIG_DER",
         SigHighS => "SIG_HIGH_S",

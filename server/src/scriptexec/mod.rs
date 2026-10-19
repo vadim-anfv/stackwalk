@@ -9,7 +9,8 @@
 //! script_tests.json (src/core_vectors.rs), which led to: ECDSA signatures parsed lax DER with
 //! S normalized, as Core verifies them; WITNESS_PUBKEYTYPE an option, checked as Core does
 //! (compressed = 33 bytes with an 02 / 03 prefix, not just "not 65 bytes"); DERSIG, LOW_S and
-//! STRICTENC added (Core's CheckSignatureEncoding / CheckPubKeyEncoding).
+//! STRICTENC added (Core's CheckSignatureEncoding / CheckPubKeyEncoding); the 10000-byte script
+//! size limit.
 
 use std::borrow::Cow;
 
@@ -41,6 +42,9 @@ const MAX_OPS_PER_SCRIPT: usize = 201;
 
 /// Maximum number of bytes pushable to the stack
 const MAX_SCRIPT_ELEMENT_SIZE: usize = 520;
+
+/// Maximum script size in bytes (legacy and segwit v0)
+const MAX_SCRIPT_SIZE: usize = 10_000;
 
 /// Maximum number of values on script interpreter stack
 const MAX_STACK_SIZE: usize = 1000;
@@ -219,11 +223,14 @@ impl Exec {
             }
         }
 
+        // as Core: the size limit comes first, even for a script that does not parse
+        let too_big = ctx != ExecCtx::Tapscript && script.len() > MAX_SCRIPT_SIZE;
+
         // We want to make sure the script is valid so we don't have to throw parsing errors
         // while executing. Minimal pushes are checked as they run, as Core does (MINIMALDATA
         // applies to executed pushes only).
         let instructions = script.instructions();
-        if let Some(err) = instructions.clone().find_map(|res| res.err()) {
+        if !too_big && let Some(err) = instructions.clone().find_map(|res| res.err()) {
             return Err(Error::InvalidScript(err));
         }
 
@@ -242,7 +249,7 @@ impl Exec {
             Encodable::consensus_encode(&script_witness, &mut bitcoin::io::sink()).unwrap();
         let validation_weight = VALIDATION_WEIGHT_OFFSET + witness_size as i64;
 
-        Ok(Exec {
+        let mut exec = Exec {
             ctx,
             result: None,
 
@@ -261,7 +268,12 @@ impl Exec {
 
             opt,
             tx,
-        })
+        };
+        if too_big {
+            // the first step reports it, before any instruction is read
+            let _ = exec.fail(ExecError::ScriptSize);
+        }
+        Ok(exec)
     }
 
     //////////////////

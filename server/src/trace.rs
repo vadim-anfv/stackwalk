@@ -99,6 +99,7 @@ fn err_text(e: &ExecError, op: Option<Opcode>) -> String {
         SigHashtype => format!("undefined sighash type (STRICTENC, {POLICY})"),
         OpCount => "too many opcodes".into(),
         StackSize => "stack too large".into(),
+        ScriptSize => "script larger than 10000 bytes".into(),
         PushSize => "push too large".into(),
         ScriptIntNumericOverflow => "number out of range".into(),
         PubkeyType => "not a valid public key".into(),
