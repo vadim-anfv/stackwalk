@@ -1,0 +1,242 @@
+
+================ WSH: or(pk(A),and(pk(B),older(144)))
+miniscript : or_d(pk(A),and_v(v:pk(B),older(144)))
+descriptor : wsh(or_d(pk(A),and_v(v:pk(B),older(144))))#uj59xatx
+descriptor(pk): wsh(or_d(pk(030ba1d27a29c274219938f2a7c0c31e14f715f595f606c54e8da983141d349b66),and_v(v:pk(038e13a1651814db4004a5ee7c27bb459f8773ec77ed75483b145217053cf8f2ba),older(144))))#0m2un6tt
+script_pubkey : OP_0 OP_PUSHBYTES_32 4baaf1f5306f75ff848b6ea4009004c481ca9781436302e3993729defbb70675
+witnessScript : OP_PUSHBYTES_33 030ba1d27a29c274219938f2a7c0c31e14f715f595f606c54e8da983141d349b66 OP_CHECKSIG OP_IFDUP OP_NOTIF OP_PUSHBYTES_33 038e13a1651814db4004a5ee7c27bb459f8773ec77ed75483b145217053cf8f2ba OP_CHECKSIGVERIFY OP_PUSHBYTES_2 9000 OP_CSV OP_ENDIF
+  instructions:
+    #0  PushBytes(PushBytes([3, 11, 161, 210, 122, 41, 194, 116, 33, 153, 56, 242, 167, 192, 195, 30, 20, 247, 21, 245, 149, 246, 6, 197, 78, 141, 169, 131, 20, 29, 52, 155, 102]))
+    #1  Op(OP_CHECKSIG)
+    #2  Op(OP_IFDUP)
+    #3  Op(OP_NOTIF)
+    #4  PushBytes(PushBytes([3, 142, 19, 161, 101, 24, 20, 219, 64, 4, 165, 238, 124, 39, 187, 69, 159, 135, 115, 236, 119, 237, 117, 72, 59, 20, 82, 23, 5, 60, 248, 242, 186]))
+    #5  Op(OP_CHECKSIGVERIFY)
+    #6  PushBytes(PushBytes([144, 0]))
+    #7  Op(OP_CSV)
+    #8  Op(OP_ENDIF)
+  node -> instruction range:
+    [ 0.. 9) or_d(pk(A),and_v(v:pk(B),older(144)))
+      [ 0.. 2) pk(A)
+        [ 0.. 1) pk_k(A)
+      [ 4.. 8) and_v(v:pk(B),older(144))
+        [ 4.. 6) v:pk(B)   (VERIFY merged into child's last op)
+          [ 4.. 6) pk(B)
+            [ 4.. 5) pk_k(B)
+        [ 6.. 8) older(144)
+  spend paths (auto, via build_template over asset subsets):
+    assets=["sign:pk(A)"]  witness template=["sig(A)"]
+    assets=["sign:pk(B)", "older(144)"]  witness template=["sig(B)", "<>"]
+
+--- case: A signs (nSequence=4294967293)
+  witness (2 items, last = witnessScript): ["sig(A)", "77B:21030ba1d27a29c274219938f2a7c0c31e14f715f595f606c54e8da983141d349b66ac736421038e13a1651814db4004a5ee7c27bb459f8773ec77ed75483b145217053cf8f2baad029000b268"]
+  init  stack=[sig(A)]
+  #0       PUSH pk(A)                   main=[sig(A), pk(A)] alt=[]   <- pk_k(A)
+  #1       OP_CHECKSIG                  main=[0x01] alt=[]   <- pk(A)
+  #2       OP_IFDUP                     main=[0x01, 0x01] alt=[]   <- or_d(pk(A),and_v(v:pk(B),older(144)))
+  #3       OP_NOTIF                     main=[0x01] alt=[]   <- or_d(pk(A),and_v(v:pk(B),older(144)))
+  #4  SKIP PUSH pk(B)                   main=[0x01] alt=[]   <- pk_k(B)
+  #5  SKIP OP_CHECKSIGVERIFY            main=[0x01] alt=[]   <- pk(B)
+  #6  SKIP PUSH 0x9000                  main=[0x01] alt=[]   <- older(144)
+  #7  SKIP OP_CSV                       main=[0x01] alt=[]   <- older(144)
+  #8  c    OP_ENDIF                     main=[0x01] alt=[]   <- or_d(pk(A),and_v(v:pk(B),older(144)))
+  RESULT success=true error=None opcode=None final_stack=[0x01]
+  libbitcoinconsensus (Core 26): Ok(())
+
+--- case: B signs, older(144) satisfied (nSequence=144)
+  witness (3 items, last = witnessScript): ["sig(B)", "0B:", "77B:21030ba1d27a29c274219938f2a7c0c31e14f715f595f606c54e8da983141d349b66ac736421038e13a1651814db4004a5ee7c27bb459f8773ec77ed75483b145217053cf8f2baad029000b268"]
+  init  stack=[sig(B), <>]
+  #0       PUSH pk(A)                   main=[sig(B), <>, pk(A)] alt=[]   <- pk_k(A)
+  #1       OP_CHECKSIG                  main=[sig(B), <>] alt=[]   <- pk(A)
+  #2       OP_IFDUP                     main=[sig(B), <>] alt=[]   <- or_d(pk(A),and_v(v:pk(B),older(144)))
+  #3       OP_NOTIF                     main=[sig(B)] alt=[]   <- or_d(pk(A),and_v(v:pk(B),older(144)))
+  #4       PUSH pk(B)                   main=[sig(B), pk(B)] alt=[]   <- pk_k(B)
+  #5       OP_CHECKSIGVERIFY            main=[] alt=[]   <- pk(B)
+  #6       PUSH 0x9000                  main=[0x9000] alt=[]   <- older(144)
+  #7       OP_CSV                       main=[0x9000] alt=[]   <- older(144)
+  #8       OP_ENDIF                     main=[0x9000] alt=[]   <- or_d(pk(A),and_v(v:pk(B),older(144)))
+  RESULT success=true error=None opcode=None final_stack=[0x9000]
+  libbitcoinconsensus (Core 26): Ok(())
+
+--- case: B signs, sequence too low (honest satisfier) (nSequence=10)
+  get_satisfaction failed: could not satisfy
+
+--- case: B signs, sequence too low, satisfier LIES about older (nSequence=10)
+  witness (3 items, last = witnessScript): ["sig(B)", "0B:", "77B:21030ba1d27a29c274219938f2a7c0c31e14f715f595f606c54e8da983141d349b66ac736421038e13a1651814db4004a5ee7c27bb459f8773ec77ed75483b145217053cf8f2baad029000b268"]
+  init  stack=[sig(B), <>]
+  #0       PUSH pk(A)                   main=[sig(B), <>, pk(A)] alt=[]   <- pk_k(A)
+  #1       OP_CHECKSIG                  main=[sig(B), <>] alt=[]   <- pk(A)
+  #2       OP_IFDUP                     main=[sig(B), <>] alt=[]   <- or_d(pk(A),and_v(v:pk(B),older(144)))
+  #3       OP_NOTIF                     main=[sig(B)] alt=[]   <- or_d(pk(A),and_v(v:pk(B),older(144)))
+  #4       PUSH pk(B)                   main=[sig(B), pk(B)] alt=[]   <- pk_k(B)
+  #5       OP_CHECKSIGVERIFY            main=[] alt=[]   <- pk(B)
+  #6       PUSH 0x9000                  main=[0x9000] alt=[]   <- older(144)
+  #7  FAIL OP_CSV
+  RESULT success=false error=Some(UnsatisfiedLocktime) opcode=Some(OP_CSV) final_stack=[0x9000]
+  libbitcoinconsensus (Core 26): Err(ERR_SCRIPT)
+
+--- case: B signs, wrong key path: B signs but A expected? (A and B both) (nSequence=144)
+  witness (2 items, last = witnessScript): ["sig(A)", "77B:21030ba1d27a29c274219938f2a7c0c31e14f715f595f606c54e8da983141d349b66ac736421038e13a1651814db4004a5ee7c27bb459f8773ec77ed75483b145217053cf8f2baad029000b268"]
+  init  stack=[sig(A)]
+  #0       PUSH pk(A)                   main=[sig(A), pk(A)] alt=[]   <- pk_k(A)
+  #1       OP_CHECKSIG                  main=[0x01] alt=[]   <- pk(A)
+  #2       OP_IFDUP                     main=[0x01, 0x01] alt=[]   <- or_d(pk(A),and_v(v:pk(B),older(144)))
+  #3       OP_NOTIF                     main=[0x01] alt=[]   <- or_d(pk(A),and_v(v:pk(B),older(144)))
+  #4  SKIP PUSH pk(B)                   main=[0x01] alt=[]   <- pk_k(B)
+  #5  SKIP OP_CHECKSIGVERIFY            main=[0x01] alt=[]   <- pk(B)
+  #6  SKIP PUSH 0x9000                  main=[0x01] alt=[]   <- older(144)
+  #7  SKIP OP_CSV                       main=[0x01] alt=[]   <- older(144)
+  #8  c    OP_ENDIF                     main=[0x01] alt=[]   <- or_d(pk(A),and_v(v:pk(B),older(144)))
+  RESULT success=true error=None opcode=None final_stack=[0x01]
+  libbitcoinconsensus (Core 26): Ok(())
+
+================ WSH: or(and(pk(A),sha256(H)),and(pk(B),hash160(G)))
+miniscript : andor(pk(A),sha256(H),and_v(v:pk(B),hash160(G)))
+descriptor : wsh(andor(pk(A),sha256(H),and_v(v:pk(B),hash160(G))))#xmxsar55
+descriptor(pk): wsh(andor(pk(030ba1d27a29c274219938f2a7c0c31e14f715f595f606c54e8da983141d349b66),sha256(3aabb2923a2d036ca5e2b7443c84d3c9d25c5687ac593dc6aeccf95e6131ed7f),and_v(v:pk(038e13a1651814db4004a5ee7c27bb459f8773ec77ed75483b145217053cf8f2ba),hash160(a6c3ff3f0a4641f0a101a0cb3277b93601a3398b))))#7y37ru8e
+script_pubkey : OP_0 OP_PUSHBYTES_32 3f5f29e5cb7a97a8714cfff6701a9ba2075c663aa7b571bab54d90a9eecb7867
+witnessScript : OP_PUSHBYTES_33 030ba1d27a29c274219938f2a7c0c31e14f715f595f606c54e8da983141d349b66 OP_CHECKSIG OP_NOTIF OP_PUSHBYTES_33 038e13a1651814db4004a5ee7c27bb459f8773ec77ed75483b145217053cf8f2ba OP_CHECKSIGVERIFY OP_SIZE OP_PUSHBYTES_1 20 OP_EQUALVERIFY OP_HASH160 OP_PUSHBYTES_20 a6c3ff3f0a4641f0a101a0cb3277b93601a3398b OP_EQUAL OP_ELSE OP_SIZE OP_PUSHBYTES_1 20 OP_EQUALVERIFY OP_SHA256 OP_PUSHBYTES_32 3aabb2923a2d036ca5e2b7443c84d3c9d25c5687ac593dc6aeccf95e6131ed7f OP_EQUAL OP_ENDIF
+  instructions:
+    #0  PushBytes(PushBytes([3, 11, 161, 210, 122, 41, 194, 116, 33, 153, 56, 242, 167, 192, 195, 30, 20, 247, 21, 245, 149, 246, 6, 197, 78, 141, 169, 131, 20, 29, 52, 155, 102]))
+    #1  Op(OP_CHECKSIG)
+    #2  Op(OP_NOTIF)
+    #3  PushBytes(PushBytes([3, 142, 19, 161, 101, 24, 20, 219, 64, 4, 165, 238, 124, 39, 187, 69, 159, 135, 115, 236, 119, 237, 117, 72, 59, 20, 82, 23, 5, 60, 248, 242, 186]))
+    #4  Op(OP_CHECKSIGVERIFY)
+    #5  Op(OP_SIZE)
+    #6  PushBytes(PushBytes([32]))
+    #7  Op(OP_EQUALVERIFY)
+    #8  Op(OP_HASH160)
+    #9  PushBytes(PushBytes([166, 195, 255, 63, 10, 70, 65, 240, 161, 1, 160, 203, 50, 119, 185, 54, 1, 163, 57, 139]))
+    #10 Op(OP_EQUAL)
+    #11 Op(OP_ELSE)
+    #12 Op(OP_SIZE)
+    #13 PushBytes(PushBytes([32]))
+    #14 Op(OP_EQUALVERIFY)
+    #15 Op(OP_SHA256)
+    #16 PushBytes(PushBytes([58, 171, 178, 146, 58, 45, 3, 108, 165, 226, 183, 68, 60, 132, 211, 201, 210, 92, 86, 135, 172, 89, 61, 198, 174, 204, 249, 94, 97, 49, 237, 127]))
+    #17 Op(OP_EQUAL)
+    #18 Op(OP_ENDIF)
+  node -> instruction range:
+    [ 0..19) andor(pk(A),sha256(H),and_v(v:pk(B),hash160(G)))
+      [ 0.. 2) pk(A)
+        [ 0.. 1) pk_k(A)
+      [ 3..11) and_v(v:pk(B),hash160(G))
+        [ 3.. 5) v:pk(B)   (VERIFY merged into child's last op)
+          [ 3.. 5) pk(B)
+            [ 3.. 4) pk_k(B)
+        [ 5..11) hash160(G)
+      [12..18) sha256(H)
+  spend paths (auto, via build_template over asset subsets):
+    assets=["sign:pk(A)", "preimage-of:sha256(H)"]  witness template=["preimage[sha256(H)]", "sig(A)"]
+    assets=["sign:pk(B)", "preimage-of:hash160(G)"]  witness template=["preimage[hash160(G)]", "sig(B)", "<>"]
+
+--- case: A + preimage(H) (nSequence=4294967293)
+  witness (3 items, last = witnessScript): ["preimage(H)", "sig(A)", "139B:21030ba1d27a29c274219938f2a7c0c31e14f715f595f606c54e8da983141d349b66ac6421038e13a1651814db4004a5ee7c27bb459f8773ec77ed75483b145217053cf8f2baad82012088a914a6c3ff3f0a4641f0a101a0cb3277b93601a3398b876782012088a8203aabb2923a2d036ca5e2b7443c84d3c9d25c5687ac593dc6aeccf95e6131ed7f8768"]
+  init  stack=[preimage(H), sig(A)]
+  #0       PUSH pk(A)                   main=[preimage(H), sig(A), pk(A)] alt=[]   <- pk_k(A)
+  #1       OP_CHECKSIG                  main=[preimage(H), 0x01] alt=[]   <- pk(A)
+  #2       OP_NOTIF                     main=[preimage(H)] alt=[]   <- andor(pk(A),sha256(H),and_v(v:pk(B),hash160(G)))
+  #3  SKIP PUSH pk(B)                   main=[preimage(H)] alt=[]   <- pk_k(B)
+  #4  SKIP OP_CHECKSIGVERIFY            main=[preimage(H)] alt=[]   <- pk(B)
+  #5  SKIP OP_SIZE                      main=[preimage(H)] alt=[]   <- hash160(G)
+  #6  SKIP PUSH 0x20                    main=[preimage(H)] alt=[]   <- hash160(G)
+  #7  SKIP OP_EQUALVERIFY               main=[preimage(H)] alt=[]   <- hash160(G)
+  #8  SKIP OP_HASH160                   main=[preimage(H)] alt=[]   <- hash160(G)
+  #9  SKIP PUSH hash160(G)              main=[preimage(H)] alt=[]   <- hash160(G)
+  #10 SKIP OP_EQUAL                     main=[preimage(H)] alt=[]   <- hash160(G)
+  #11 c    OP_ELSE                      main=[preimage(H)] alt=[]   <- andor(pk(A),sha256(H),and_v(v:pk(B),hash160(G)))
+  #12      OP_SIZE                      main=[preimage(H), 0x20] alt=[]   <- sha256(H)
+  #13      PUSH 0x20                    main=[preimage(H), 0x20, 0x20] alt=[]   <- sha256(H)
+  #14      OP_EQUALVERIFY               main=[preimage(H)] alt=[]   <- sha256(H)
+  #15      OP_SHA256                    main=[sha256(H)] alt=[]   <- sha256(H)
+  #16      PUSH sha256(H)               main=[sha256(H), sha256(H)] alt=[]   <- sha256(H)
+  #17      OP_EQUAL                     main=[0x01] alt=[]   <- sha256(H)
+  #18      OP_ENDIF                     main=[0x01] alt=[]   <- andor(pk(A),sha256(H),and_v(v:pk(B),hash160(G)))
+  RESULT success=true error=None opcode=None final_stack=[0x01]
+  libbitcoinconsensus (Core 26): Ok(())
+
+--- case: B + preimage(G) (nSequence=4294967293)
+  witness (4 items, last = witnessScript): ["preimage(G)", "sig(B)", "0B:", "139B:21030ba1d27a29c274219938f2a7c0c31e14f715f595f606c54e8da983141d349b66ac6421038e13a1651814db4004a5ee7c27bb459f8773ec77ed75483b145217053cf8f2baad82012088a914a6c3ff3f0a4641f0a101a0cb3277b93601a3398b876782012088a8203aabb2923a2d036ca5e2b7443c84d3c9d25c5687ac593dc6aeccf95e6131ed7f8768"]
+  init  stack=[preimage(G), sig(B), <>]
+  #0       PUSH pk(A)                   main=[preimage(G), sig(B), <>, pk(A)] alt=[]   <- pk_k(A)
+  #1       OP_CHECKSIG                  main=[preimage(G), sig(B), <>] alt=[]   <- pk(A)
+  #2       OP_NOTIF                     main=[preimage(G), sig(B)] alt=[]   <- andor(pk(A),sha256(H),and_v(v:pk(B),hash160(G)))
+  #3       PUSH pk(B)                   main=[preimage(G), sig(B), pk(B)] alt=[]   <- pk_k(B)
+  #4       OP_CHECKSIGVERIFY            main=[preimage(G)] alt=[]   <- pk(B)
+  #5       OP_SIZE                      main=[preimage(G), 0x20] alt=[]   <- hash160(G)
+  #6       PUSH 0x20                    main=[preimage(G), 0x20, 0x20] alt=[]   <- hash160(G)
+  #7       OP_EQUALVERIFY               main=[preimage(G)] alt=[]   <- hash160(G)
+  #8       OP_HASH160                   main=[hash160(G)] alt=[]   <- hash160(G)
+  #9       PUSH hash160(G)              main=[hash160(G), hash160(G)] alt=[]   <- hash160(G)
+  #10      OP_EQUAL                     main=[0x01] alt=[]   <- hash160(G)
+  #11      OP_ELSE                      main=[0x01] alt=[]   <- andor(pk(A),sha256(H),and_v(v:pk(B),hash160(G)))
+  #12 SKIP OP_SIZE                      main=[0x01] alt=[]   <- sha256(H)
+  #13 SKIP PUSH 0x20                    main=[0x01] alt=[]   <- sha256(H)
+  #14 SKIP OP_EQUALVERIFY               main=[0x01] alt=[]   <- sha256(H)
+  #15 SKIP OP_SHA256                    main=[0x01] alt=[]   <- sha256(H)
+  #16 SKIP PUSH sha256(H)               main=[0x01] alt=[]   <- sha256(H)
+  #17 SKIP OP_EQUAL                     main=[0x01] alt=[]   <- sha256(H)
+  #18 c    OP_ENDIF                     main=[0x01] alt=[]   <- andor(pk(A),sha256(H),and_v(v:pk(B),hash160(G)))
+  RESULT success=true error=None opcode=None final_stack=[0x01]
+  libbitcoinconsensus (Core 26): Ok(())
+
+================ TR script path: tr(NUMS,{pk(A),and_v(v:pk(B),older(144))})
+descriptor(pk): tr(0250929b74c1a04954b78b4b6035e97a5e078a5a0f28ec96d547bfee9ace803ac0,{pk(030ba1d27a29c274219938f2a7c0c31e14f715f595f606c54e8da983141d349b66),and_v(v:pk(038e13a1651814db4004a5ee7c27bb459f8773ec77ed75483b145217053cf8f2ba),older(144))})#m9f7lkmr
+script_pubkey : OP_PUSHNUM_1 OP_PUSHBYTES_32 fcd73524899bd88d81eda6ae1322dddb9722fbc2af0367aefed5aebfef3a6edf
+
+--- case: A signs (nSequence=4294967293)
+  witness: 1 stack items + leaf script + control block (65B)
+  leaf script: OP_PUSHBYTES_32 0ba1d27a29c274219938f2a7c0c31e14f715f595f606c54e8da983141d349b66 OP_CHECKSIG
+  init  stack=[sig(A)]
+  #0       PUSH pk(A)                   main=[sig(A), pk(A)] alt=[]   <- pk_k(A)
+  #1       OP_CHECKSIG                  main=[0x01] alt=[]   <- pk(A)
+  RESULT success=true error=None opcode=None final_stack=[0x01]
+  libbitcoinconsensus (Core 26): Ok(())
+
+--- case: B after 144 (nSequence=144)
+  witness: 1 stack items + leaf script + control block (65B)
+  leaf script: OP_PUSHBYTES_32 8e13a1651814db4004a5ee7c27bb459f8773ec77ed75483b145217053cf8f2ba OP_CHECKSIGVERIFY OP_PUSHBYTES_2 9000 OP_CSV
+  init  stack=[sig(B)]
+  #0       PUSH pk(B)                   main=[sig(B), pk(B)] alt=[]   <- pk_k(B)
+  #1       OP_CHECKSIGVERIFY            main=[] alt=[]   <- pk(B)
+  #2       PUSH 0x9000                  main=[0x9000] alt=[]   <- older(144)
+  #3       OP_CSV                       main=[0x9000] alt=[]   <- older(144)
+  RESULT success=true error=None opcode=None final_stack=[0x9000]
+  libbitcoinconsensus (Core 26): Ok(())
+--- negative: same witness, executed against tx with nSequence=145 (sighash differs)
+  init  stack=[sig(B)]
+  #0       PUSH pk(B)                   main=[sig(B), pk(B)] alt=[]   <- pk_k(B)
+  #1  FAIL OP_CHECKSIGVERIFY
+  RESULT success=false error=Some(SchnorrSig) opcode=Some(OP_CHECKSIGVERIFY) final_stack=[sig(B), pk(B)]
+
+================ NEGATIVE / LIMITS
+--- (a) sig(A) over a different tx -> CHECKSIG must push 0
+  init  stack=[sig(A)]
+  #0       PUSH pk(A)                   main=[sig(A), pk(A)] alt=[]   <- pk_k(A)
+  #1       OP_CHECKSIG                  main=[<>] alt=[]   <- pk(A)
+  #2       OP_IFDUP                     main=[<>] alt=[]   <- or_d(pk(A),and_v(v:pk(B),older(144)))
+  #3       OP_NOTIF                     main=[] alt=[]   <- or_d(pk(A),and_v(v:pk(B),older(144)))
+  #4       PUSH pk(B)                   main=[pk(B)] alt=[]   <- pk_k(B)
+  #5  FAIL OP_CHECKSIGVERIFY
+  RESULT success=false error=Some(InvalidStackOperation) opcode=Some(OP_CHECKSIGVERIFY) final_stack=[pk(B)]
+--- (b) multi(2,A,B): OP_PUSHNUM_2 OP_PUSHBYTES_33 030ba1d27a29c274219938f2a7c0c31e14f715f595f606c54e8da983141d349b66 OP_PUSHBYTES_33 038e13a1651814db4004a5ee7c27bb459f8773ec77ed75483b145217053cf8f2ba OP_PUSHNUM_2 OP_CHECKMULTISIG
+  init  stack=[<>, sig(A), sig(B)]
+  #0       OP_PUSHNUM_2                 main=[<>, sig(A), sig(B), 0x02] alt=[]   <- multi(2,A,B)
+  #1       PUSH pk(A)                   main=[<>, sig(A), sig(B), 0x02, pk(A)] alt=[]   <- multi(2,A,B)
+  #2       PUSH pk(B)                   main=[<>, sig(A), sig(B), 0x02, pk(A), pk(B)] alt=[]   <- multi(2,A,B)
+  #3       OP_PUSHNUM_2                 main=[<>, sig(A), sig(B), 0x02, pk(A), pk(B), 0x02] alt=[]   <- multi(2,A,B)
+
+thread 'main' (37036) panicked at ~/.cargo/git/checkouts/rust-bitcoin-scriptexec-f4734fc19467d5b6/ba96bc2/src/lib.rs:1016:17:
+not implemented
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+  catch_unwind result is_err (panicked) = true
+  libbitcoinconsensus (Core 26) on same witness: Ok(())
+
+================ LAYOUT COVERAGE
+  OK thresh(2,pk(A),s:pk(B),sln:older(10)): 17 instructions, 11 nodes
+  OK or_i(and_v(v:pkh(A),hash256(H)),or_b(pk(B),a:pk(C))): 21 instructions, 12 nodes
+  OK andor(pk(A),and_v(or_c(pk(B),v:sha256(H)),pk(D)),and_b(pk(C),a:after(500))): 24 instructions, 16 nodes
+  OK or_d(multi(2,A,B,C),and_v(v:ripemd160(R),j:pk(D))): 21 instructions, 8 nodes
+  OK and_v(v:pk(A),c:pk_h(B)): 7 instructions, 6 nodes
+  OK and_b(pk(A),adv:older(5)): 11 instructions, 7 nodes
+  OK and_b(n:pk(A),s:pk(B)): 7 instructions, 7 nodes

@@ -1,0 +1,792 @@
+:root {
+  --bg: #0f1115;
+  --panel: #161a21;
+  --line: #262c36;
+  --edge: #3b4452; /* panel borders: stronger than --line so the boxes stand apart */
+  --text: #d7dce4;
+  --muted: #7d8696;
+  --accent: #f7931a;
+  --ok: #3fb950;
+  --fail: #f85149;
+  --k-sig: #f7931a;
+  --k-pubkey: #58a6ff;
+  --k-hash: #bc8cff;
+  --k-num: #8b949e;
+  --mono: ui-monospace, 'JetBrains Mono', 'SFMono-Regular', Menlo, monospace;
+  color-scheme: dark;
+}
+
+/* theme follows the system unless data-theme on <html> overrides it */
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme='dark']) {
+    --bg: #f6f7f9;
+    --panel: #ffffff;
+    --line: #dde1e7;
+    --edge: #b8c0cb;
+    --text: #1f2328;
+    --muted: #656d76;
+    --k-num: #6e7781;
+    color-scheme: light;
+  }
+}
+:root[data-theme='light'] {
+  --bg: #f6f7f9;
+  --panel: #ffffff;
+  --line: #dde1e7;
+  --edge: #b8c0cb;
+  --text: #1f2328;
+  --muted: #656d76;
+  --k-num: #6e7781;
+  color-scheme: light;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+  color: var(--text);
+  font: 14px/1.45 system-ui, sans-serif;
+}
+
+code, kbd, .script, .item, .op-title, .chip, select { font-family: var(--mono); }
+
+button {
+  font: inherit;
+  color: inherit;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 4px 10px;
+  cursor: pointer;
+}
+button:hover:not(:disabled) { border-color: var(--muted); }
+button:disabled { opacity: 0.35; cursor: default; }
+
+kbd {
+  font-size: 11px;
+  padding: 0 4px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  color: var(--muted);
+}
+
+.muted, .k { color: var(--muted); }
+.k { font-size: 12px; }
+
+h2 {
+  margin: 0 0 8px;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+}
+h2 .muted { text-transform: none; letter-spacing: 0; font-weight: 400; }
+
+/* header */
+
+header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 16px;
+  padding: 8px 16px;
+  border-bottom: 1px solid var(--line);
+}
+
+/* Bicubik by Anton Kudin (Jovanny Lemonad freeware) */
+@font-face { font-family: 'Bicubik'; src: url('bicubik.woff') format('woff'); font-display: swap; }
+.brand { font-family: 'Bicubik', sans-serif; font-size: 16px; letter-spacing: 1.5px; text-transform: uppercase; }
+.brand span { color: color-mix(in srgb, var(--text) 30%, var(--muted)); }
+.theme { margin-left: auto; min-width: 5.5em; }
+.help { min-width: 2.2em; font-weight: 600; }
+/* looks like the header buttons next to it */
+.code-link { display: inline-flex; align-items: center; justify-content: center; align-self: stretch; padding: 0 9px; border: 1px solid var(--line); border-radius: 6px; background: var(--panel); color: var(--muted); }
+.code-link:hover { color: var(--text); border-color: var(--muted); }
+
+.site-foot { flex: none; padding: 2px 16px 6px; text-align: center; font-size: 12px; color: var(--muted); }
+.site-foot a { color: inherit; }
+.site-foot a:hover { color: var(--text); }
+
+/* keyboard shortcuts; padding sits on the children so a click on the dialog itself is the backdrop */
+.help-dlg {
+  padding: 0;
+  max-width: min(760px, calc(100vw - 32px));
+  background: var(--panel);
+  color: var(--text);
+  border: 1px solid var(--edge);
+  border-radius: 12px;
+}
+.help-dlg:focus { outline: none; }
+.help-dlg::backdrop { background: rgb(0 0 0 / 0.45); }
+.help-head { display: flex; justify-content: space-between; align-items: center; padding: 14px 18px 0; }
+.help-head h2 { margin: 0; }
+.help-head button { border: none; background: none; font-size: 20px; line-height: 1; padding: 0 4px; color: var(--muted); }
+.help-cols { display: flex; flex-wrap: wrap; gap: 8px 36px; padding: 6px 18px 16px; }
+.help-cols section { flex: 1 1 300px; }
+.help-cols h3 { margin: 10px 0 6px; font-size: 13px; color: var(--accent); }
+.help-cols dl { display: grid; grid-template-columns: auto 1fr; gap: 6px 14px; margin: 0; font-size: 13px; }
+.help-cols dt { white-space: nowrap; }
+.help-cols dd { margin: 0; }
+.tag {
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--accent);
+  border: 1px solid var(--accent);
+  border-radius: 10px;
+  padding: 0 6px;
+  margin-left: 4px;
+}
+
+select {
+  background: var(--panel);
+  color: var(--text);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 4px 8px;
+}
+
+/* in the source panel, lined up with the fields below */
+.paths { display: grid; grid-template-columns: 80px minmax(0, 1fr); gap: 8px; align-items: center; margin-bottom: 8px; }
+.paths > .k { white-space: nowrap; }
+.paths select { min-width: 0; text-overflow: ellipsis; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip.on, .seg button.on { border-color: var(--accent); color: var(--accent); }
+/* spend paths that are meant to fail (wrong signer, timelock not reached) */
+.chip.fails { border-style: dashed; }
+.seg { display: flex; }
+/* neighbours overlap by 1px (one shared border); the active / hovered one is
+   drawn on top so its accent border shows on all four sides */
+.seg button { border-radius: 0; position: relative; }
+.seg button + button { margin-left: -1px; }
+.seg button:hover, .seg button.on { z-index: 1; }
+.seg button:first-child { border-radius: 6px 0 0 6px; }
+.seg button:last-child { border-radius: 0 6px 6px 0; }
+
+.toggle { display: flex; align-items: center; gap: 6px; cursor: pointer; white-space: nowrap; }
+.toggles { display: flex; gap: 16px; margin-left: auto; }
+
+.hdr { display: flex; flex: 1; flex-wrap: wrap; align-items: center; gap: 12px 20px; }
+/* flag:train */
+body[data-view='explore'] .train-only,
+body[data-view='train'] .explore-only { display: none !important; }
+/* /flag:train */
+
+/* feature flags: see flags.js */
+/* flag:train */
+body:not(.ff-train) .flag-train,
+body:not(.ff-train) .views,
+body:not(.ff-leaderboard) .flag-leaderboard { display: none !important; }
+/* /flag:train */
+body:not(.ff-altStack) .flag-altStack { display: none !important; }
+/* a view switch with one view left (the build cut the others) is no switch */
+.views:not(:has(> :nth-child(2))) { display: none; }
+
+/* alt stack column: feature flag + header toggle */
+body:not(.alt-on) .stackbox.flag-altStack { display: none !important; }
+body.alt-on .stacks { grid-template-columns: minmax(0, 560px) minmax(0, 560px); }
+
+/* script refused: uses the alt stack or test keys while they are off */
+body.blocked .stacks,
+body.blocked .timeline { display: none; }
+.op-title.err { color: var(--fail); }
+.op-title.start { color: var(--text); font-style: italic; }
+
+.views button { font-weight: 600; }
+.seg.small button { padding: 2px 8px; font-size: 12px; }
+
+
+/* layout */
+
+main {
+  display: grid;
+  grid-template-columns: minmax(300px, 400px) 1fr;
+  gap: 12px;
+  padding: 12px 16px;
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}
+
+.left, .center { display: flex; flex-direction: column; gap: 12px; min-width: 0; min-height: 0; }
+/* placed over the step card + script + stack cells by the layouts below;
+   the panels inside keep --pad (set there) from its edge */
+.run-frame { display: none; border: 1px solid var(--edge); border-radius: 14px; background: color-mix(in srgb, var(--panel) 45%, var(--bg)); }
+.left .grow { flex: 0 1 auto; min-height: 0; overflow: auto; }
+
+.panel {
+  background: var(--panel);
+  border: 1px solid var(--edge);
+  border-radius: 10px;
+  padding: 10px 14px;
+}
+
+body[data-mode='script'] .ms-only,
+body:not([data-mode='script']) .script-only-field { display: none; }
+
+/* source panel */
+
+.src-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 8px; }
+.src-head h2 { margin: 0; white-space: nowrap; }
+.src-head h2 kbd { font-weight: 400; letter-spacing: 0; margin-left: 4px; }
+/* minmax(0, 1fr): a long unbreakable value (a hex key) must wrap, not widen the panel */
+.field { display: grid; grid-template-columns: 80px minmax(0, 1fr); gap: 8px; align-items: center; }
+/* both fields are editable; only this arrow tells which one is the source */
+/* keeps its line when empty: the fields don't jump as the source changes */
+.flow { font-size: 12px; line-height: 16px; min-height: 20px; color: var(--text); padding: 2px 0 2px 88px; }
+
+.src-input {
+  width: 100%;
+  font: 14px/1.4 var(--mono);
+  color: var(--text);
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 6px 9px;
+}
+/* source fields grow to fit the whole text (height set from app.js);
+   policy / miniscript have no spaces, so they may wrap anywhere */
+textarea.src-input { display: block; resize: none; overflow: hidden; overflow-wrap: anywhere; }
+.field { align-items: start; }
+.field > .k { padding-top: 7px; }
+.wrap-field { margin-top: 6px; }
+.wrap-field > .k { padding-top: 4px; }
+.desc-field { margin-top: 6px; }
+.wrap-warn { font-size: 12px; color: var(--accent); padding: 4px 0 0 88px; }
+.desc-sum { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; padding: 4px 0 0 88px; font-size: 12px; }
+.desc-sum[hidden] { display: none; }
+/* copy sits on the descriptor itself: it copies the field (+ checksum), not the line below */
+.desc-box { position: relative; min-width: 0; }
+.desc-box textarea { width: 100%; box-sizing: border-box; padding-right: 72px; }
+.copy-desc { position: absolute; top: 5px; right: 5px; padding: 1px 6px; font-size: 11px; color: var(--muted); }
+.copy-desc[hidden] { display: none; }
+.desc-sum code { color: var(--text); font-size: 13px; }
+/* test keys: the note says it; the checksum itself stays readable */
+.sum-note { color: var(--muted); font-style: italic; }
+.copied { display: none; color: var(--ok); font-family: var(--mono); overflow-wrap: anywhere; }
+.desc-sum.show-copied > * { display: none; }
+.desc-sum.show-copied > .copied { display: inline; }
+.copied.fail { color: var(--fail); }
+.src-input:focus { outline: none; border-color: var(--accent); }
+.src-input.invalid { border-color: var(--fail); }
+.src-msg { font-size: 12px; min-height: 4px; margin: 4px 0; }
+.src-msg.warn { color: var(--fail); }
+.src-msg.ok { color: var(--ok); }
+.src-msg.busy { color: var(--muted); }
+
+/* select is as wide as its longest option: let it shrink to the panel */
+.example { display: flex; align-items: center; gap: 8px; flex: 0 1 auto; min-width: 0; }
+.example select { min-width: 0; max-width: 100%; text-overflow: ellipsis; }
+
+.src .row { display: grid; grid-template-columns: 80px minmax(0, 1fr); gap: 8px; padding: 2px 0; }
+.src .row[hidden] { display: none; }
+.src code { overflow-wrap: anywhere; }
+/* the opcode map wraps at its <wbr> after commas; inside a name only as a last resort */
+.src code#miniscript { overflow-wrap: break-word; }
+.frag-ops { margin: 2px 0 6px 88px; font: 12px/1.4 var(--mono); color: var(--k-pubkey); overflow-wrap: anywhere; }
+.keys-note { font-size: 12px; color: var(--muted); margin-top: 2px; line-height: 1.4; }
+.about { font-size: 12px; color: var(--muted); margin-top: 6px; line-height: 1.4; }
+.about[hidden] { display: none; }
+
+.frag { border-radius: 3px; transition: background 0.15s; }
+.frag.hover { background: color-mix(in srgb, var(--k-pubkey) 18%, transparent); }
+.frag.active > .fh { background: color-mix(in srgb, var(--accent) 30%, transparent); border-radius: 3px; }
+
+/* script listing */
+
+.script { list-style: none; margin: 0; padding: 0; }
+.script li {
+  display: flex;
+  gap: 12px;
+  padding: 3px 8px;
+  padding-left: calc(8px + var(--depth) * var(--indent, 20px));
+  border-radius: 5px;
+  border-left: 3px solid transparent;
+  cursor: pointer;
+}
+.script .pc { color: var(--muted); min-width: 1.5em; text-align: right; font-size: 12px; padding-top: 1px; }
+.script .op.push { color: var(--k-pubkey); }
+/* a long push (a hex key) is cut, the full text is in the title */
+.script .op { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.script li.pending { opacity: 0.55; }
+.script li.done { opacity: 1; }
+.script li.skipped .op { text-decoration: line-through; color: var(--muted); }
+.script li.error { background: color-mix(in srgb, var(--fail) 18%, transparent); }
+.script li.current { background: color-mix(in srgb, var(--accent) 16%, transparent); border-left-color: var(--accent); opacity: 1; }
+/* grouped row: the ops of one leaf fragment; each op dims / strikes / lights on its own */
+.script li.group .gops { flex: 1; display: flex; flex-wrap: wrap; gap: 0 0.6em; min-width: 0; }
+.script .gop { min-width: 0; max-width: 100%; display: flex; border-radius: 3px; }
+.script .gop.pending { opacity: 0.55; }
+.script .gop.skipped .op { text-decoration: line-through; color: var(--muted); }
+.script .gop.error { background: color-mix(in srgb, var(--fail) 25%, transparent); }
+.script .gop.current { background: color-mix(in srgb, var(--accent) 30%, transparent); }
+.script.run .gop.current { background: none; }
+.script.run li.group.current { background: color-mix(in srgb, var(--accent) 16%, transparent); }
+.script li.group.current { background: color-mix(in srgb, var(--accent) 8%, transparent); }
+.script-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.link-btn { border: none; background: none; padding: 0; font-size: 12px; color: var(--muted); text-decoration: underline dotted; }
+.link-btn:hover:not(:disabled) { color: var(--text); }
+.script li.hl, .strip li.hl { outline: 1px dashed var(--k-pubkey); outline-offset: -1px; opacity: 1; }
+.script li.phase-line { justify-content: center; font-size: 12px; color: var(--k-hash); padding: 6px 8px; }
+/* step 0: before the first opcode, the witness is the stack */
+.script li.start-line .op, .strip li.start { color: var(--muted); font-style: italic; }
+.script li.start-line.current .op, .strip li.start.current { color: var(--text); }
+.script li.start-line.current { background: color-mix(in srgb, var(--text) 8%, transparent); border-left-color: var(--text); border-left-style: dashed; }
+.strip li.start.current { border-color: var(--text); background: color-mix(in srgb, var(--text) 8%, transparent); }
+/* strip: start is not an opcode - dashed, no fill, set apart from the first op */
+.strip li.start { border-style: dashed; background: transparent; margin-right: 8px; }
+
+/* script strip (phone): the script as a column next to the stack */
+
+.strip-panel, .fold { display: none; }
+.bench { display: contents; }
+.fold { margin-left: auto; flex: none; font-size: 12px; padding: 2px 8px; }
+.strip {
+  position: relative;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  max-height: 30vh;
+  overflow: auto;
+  font: 13px/1.3 var(--mono);
+}
+.strip li {
+  padding: 2px 6px;
+  border-radius: 5px;
+  border: 1px solid var(--line);
+  cursor: pointer;
+}
+.strip li.push { color: var(--k-pubkey); }
+.strip li.ctl { color: var(--k-hash); }
+.strip li.phase { flex-basis: 100%; border: 0; text-align: center; font-size: 11px; color: var(--k-hash); padding: 0; }
+.strip li.pending { opacity: 0.55; }
+.strip li.skipped { text-decoration: line-through; color: var(--muted); }
+.strip li.error { border-color: var(--fail); background: color-mix(in srgb, var(--fail) 18%, transparent); }
+.strip li.current { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 16%, transparent); opacity: 1; }
+
+/* explanation */
+
+.op-line { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; }
+.op-title { font-size: 18px; font-weight: 700; color: var(--accent); }
+.desc { color: var(--muted); }
+.more { display: none; }
+.note, .err, .ask { margin-top: 4px; }
+.note { font-family: var(--mono); }
+.err { font-family: var(--mono); color: var(--fail); }
+
+.delta { display: flex; flex-wrap: wrap; align-items: center; gap: 5px; margin-top: 6px; }
+.delta .k:not(:first-child) { margin-left: 4px; }
+.chipx {
+  font: 600 12px var(--mono);
+  color: var(--kind);
+  padding: 1px 7px;
+  border-radius: 5px;
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--kind);
+}
+.chipx.gone { opacity: 0.6; text-decoration: line-through; }
+.ask { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+
+/* stacks */
+
+.stacks { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 560px); gap: 12px; }
+.stackbox { display: flex; flex-direction: column; min-height: 0; align-self: start; max-height: 100%; }
+
+/* the stack is drawn as an open-top container: items rest on its floor.
+   Height = deepest point of the run (--rows, set in app.js); it shrinks and
+   scrolls when the screen is too short */
+.well {
+  flex: 0 1 auto;
+  height: calc(var(--rows, 4) * 39px + 20px);
+  min-height: 100px;
+  overflow-y: auto;
+  overflow-x: hidden; /* popped items slide out sideways: no scrollbar flash */
+  display: flex;
+  flex-direction: column;
+  padding: 10px;
+  border: 2px solid var(--line);
+  border-top: 0;
+  border-radius: 0 0 12px 12px;
+  background: var(--bg);
+}
+.stack { --gap: 5px; display: flex; flex-direction: column; gap: var(--gap); margin-top: auto; }
+.stack.veiled { opacity: 0.35; filter: blur(0.5px); }
+
+.empty-stack {
+  color: var(--muted);
+  padding: 14px;
+  text-align: center;
+}
+
+.item {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 4px 12px;
+  flex-wrap: wrap;
+  padding: 6px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  border-left: 4px solid var(--kind);
+  background: var(--panel);
+}
+.item .lbl { font-weight: 600; color: var(--kind); min-width: 0; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.item .hex { font-size: 11px; color: var(--muted); }
+.item .size { opacity: 0.7; }
+
+.k-sig { --kind: var(--k-sig); }
+.k-pubkey { --kind: var(--k-pubkey); }
+.k-hash { --kind: var(--k-hash); }
+.k-num { --kind: var(--k-num); }
+.k-script { --kind: var(--k-hash); }
+
+/* one step forward: popped items turn red, hold, then slide out and collapse
+   (.leaving); pushed ones drop in after them (.enter.after-pop) */
+/* timing knobs: popped leave over --t-leave, pushed start at --t-push-delay */
+.stack { --t-leave: 0.85s; --t-push-delay: 0.65s; --t-push: 0.5s; }
+.item.new { box-shadow: 0 0 0 1px var(--kind); }
+.item.enter { animation: push var(--t-push) ease-out; }
+.item.enter.after-pop { animation-delay: var(--t-push-delay); animation-fill-mode: backwards; }
+.item.leaving {
+  overflow: hidden;
+  border-color: var(--fail);
+  background: color-mix(in srgb, var(--fail) 14%, var(--panel));
+  animation: leave var(--t-leave) ease-in forwards;
+}
+.item.leaving .lbl { color: var(--fail); text-decoration: line-through; }
+
+@keyframes push {
+  from { transform: translateY(-14px); opacity: 0; }
+  to { transform: none; opacity: 1; }
+}
+@keyframes leave {
+  0%, 45% { opacity: 1; transform: none; max-height: 60px; }
+  100% { opacity: 0; transform: translateX(70%); max-height: 0; padding-top: 0; padding-bottom: 0; border-top-width: 0; border-bottom-width: 0; margin-bottom: calc(-1 * var(--gap)); } /* cancels the flex gap */
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .item.enter { animation: none; }
+  .item.leaving { display: none; }
+}
+
+/* step bar */
+
+.stepbar {
+  border-bottom: 1px solid var(--line);
+  padding: 8px 16px;
+}
+
+.controls { display: flex; align-items: center; gap: 8px 10px; flex-wrap: wrap; }
+.play { min-width: 2.6em; }
+.play.on { border-color: var(--accent); color: var(--accent); }
+.counter { min-width: 6.5em; font-family: var(--mono); font-size: 12px; }
+.result { margin-left: auto; font-family: var(--mono); }
+.result.ok { color: var(--ok); }
+.result.fail { color: var(--fail); }
+
+.timeline { flex: 1; min-width: 120px; display: flex; align-items: flex-end; gap: 3px; height: 30px; }
+.tick {
+  flex: 1 1 0;
+  min-width: 0; /* long scripts: ticks shrink instead of overflowing a phone */
+  max-width: 26px;
+  height: 100%;
+  display: flex;
+  align-items: flex-end;
+  padding: 2px;
+  border-radius: 4px;
+}
+.tick span { display: flex; flex-direction: column-reverse; gap: 1px; width: 100%; }
+.timeline.dense .tick span { gap: 0; }
+.tick i { flex: 1 1 0; min-height: 0; background: var(--kind, var(--muted)); border-radius: 1px; opacity: 0.75; }
+.tick.skipped span { opacity: 0.3; }
+.tick.error { border-color: var(--fail); }
+.tick.current { border-color: var(--accent); }
+.tick.current i { opacity: 1; }
+/* start is the state before the run, not a step: dashed, neutral, set apart */
+.tick.start { border: 1px dashed var(--edge); margin-right: 6px; }
+.tick.start.current { border-color: var(--text); }
+
+/* flag:train */
+/* train */
+
+.train { grid-template-columns: minmax(0, 1fr) minmax(300px, 380px); align-items: start; }
+.t-main, .t-side { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+
+.task-head { display: flex; justify-content: space-between; gap: 12px; }
+.t-ms { display: block; margin-top: 10px; font-size: 26px; font-weight: 700; color: var(--accent); overflow-wrap: anywhere; }
+#t-timer { font-family: var(--mono); }
+
+#t-input {
+  width: 100%;
+  resize: vertical;
+  font: 18px/1.5 var(--mono);
+  color: var(--text);
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 10px 12px;
+}
+#t-input:focus { outline: none; border-color: var(--accent); }
+
+.suggest { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; min-height: 30px; margin: 8px 0 4px; }
+.sug { font-family: var(--mono); font-size: 12px; padding: 2px 8px; }
+.sug b { color: var(--accent); font-weight: 600; }
+.sug.on { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 14%, transparent); }
+.hint { font-size: 12px; margin-left: 4px; }
+
+.toks { display: flex; flex-wrap: wrap; gap: 5px; }
+.preview { min-height: 30px; padding: 6px 0; }
+.tok {
+  font-family: var(--mono);
+  font-size: 13px;
+  padding: 2px 7px;
+  border-radius: 5px;
+  border: 1px solid var(--line);
+  background: var(--bg);
+}
+.tok-push { color: var(--k-pubkey); }
+.tok-num { color: var(--k-num); }
+.tok-flow { color: var(--k-hash); }
+.tok-error { color: var(--fail); border-color: var(--fail); text-decoration: wavy underline; }
+.tok.good { color: var(--ok); border-color: color-mix(in srgb, var(--ok) 50%, transparent); }
+.tok.bad { color: var(--fail); border-color: var(--fail); }
+.tok.want { color: var(--accent); border-color: var(--accent); }
+.tok.missing { color: var(--muted); border-style: dashed; }
+
+.t-actions { display: flex; gap: 8px; margin-top: 8px; flex-wrap: wrap; }
+
+.t-result.ok { border-color: var(--ok); }
+.t-result.fail { border-color: var(--fail); }
+.verdict { font-weight: 600; margin-bottom: 10px; }
+.t-result.ok .verdict { color: var(--ok); }
+.t-result.fail .verdict { color: var(--fail); }
+.cmp { display: grid; grid-template-columns: 70px 1fr; gap: 8px; align-items: start; margin-top: 6px; }
+
+.stats { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; }
+.stat { display: flex; flex-direction: column; align-items: center; }
+.stat .v { font: 700 20px var(--mono); }
+.stat .k { font-size: 11px; }
+
+.board-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 10px; }
+.board-head h2 { margin: 0; }
+.board { width: 100%; border-collapse: collapse; font-size: 13px; }
+.board th { text-align: left; font-weight: 500; color: var(--muted); font-size: 11px; padding: 4px 6px; }
+.board td { padding: 5px 6px; border-top: 1px solid var(--line); font-family: var(--mono); }
+.board tr.you td { color: var(--accent); font-weight: 700; background: color-mix(in srgb, var(--accent) 10%, transparent); }
+
+.cheats { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 4px 12px; font-size: 12px; }
+.cheats div { display: flex; gap: 8px; align-items: baseline; min-width: 0; }
+.cheats kbd { flex: none; min-width: 44px; text-align: center; color: var(--accent); }
+.cheats span { min-width: 0; overflow-wrap: anywhere; color: var(--muted); font-family: var(--mono); font-size: 11px; }
+
+.palette { display: none; flex-wrap: wrap; gap: 5px; margin-bottom: 8px; }
+.palette button { font-family: var(--mono); font-size: 13px; padding: 6px 9px; }
+
+@media (max-width: 860px), (pointer: coarse) {
+  .palette { display: flex; }
+}
+
+@media (max-width: 860px) {
+  .train { grid-template-columns: 1fr; }
+  .t-ms { font-size: 20px; }
+  .stats { grid-template-columns: repeat(3, 1fr); row-gap: 10px; }
+  .cheats { grid-template-columns: 1fr; }
+}
+/* /flag:train */
+
+/* desktop explore: source | script | stack, the step card over script and
+   stack. The listing and the stack are as tall as their content, up to the
+   window bottom, then they scroll inside themselves. .left / .center / .bench dissolve into the grid.
+   On very wide screens everything is centered at --page width */
+@media (min-width: 861px) {
+  /* = the explore columns at their widest (460 + 560 + 480) + gaps + padding:
+     the header lines up with the panels */
+  :root { --page: 1556px; }
+  .brand { font-size: 24px; letter-spacing: 2px; }
+  /* the toggles, moved here from the header by app.js; inside an h2 they drop its caps */
+  .toggle-slot { font-size: 13px; font-weight: 400; color: var(--text); text-transform: none; letter-spacing: 0; }
+  .stackbox h2 { display: flex; align-items: center; gap: 6px; }
+  .stackbox h2 .toggle-slot { margin-left: auto; }
+  /* branches (IF / ELSE) stand out in the listing */
+  .script { --indent: 32px; }
+  /* room to spare: taller ticks so the mini stacks read */
+  .timeline { height: 56px; gap: 4px; }
+  .tick { max-width: 40px; }
+  /* --edge, not --line: on the run frame's tinted background a --line border vanishes */
+  .controls > button { height: 48px; min-width: 52px; font-size: 18px; border-color: var(--edge); }
+  .counter { font-size: 14px; }
+  header { padding-inline: max(16px, calc((100% - var(--page)) / 2 + 16px)); }
+  main.explore {
+    /* the stack column is only as wide as the stack, so the step card above
+       ends where the stack does; the script column takes the rest */
+    grid-template-columns: minmax(300px, 460px) minmax(220px, 560px) minmax(260px, 480px);
+    /* row 2 is as tall as its content, at most what the window leaves: the
+       frame ends under the tallest panel, and long ones scroll inside */
+    grid-template-rows: auto auto minmax(0, auto) 1fr;
+    align-content: start;
+    /* the last row is empty on the right: a left column taller than the run grows it,
+       instead of stretching the step card and the panels */
+    grid-template-areas: 'src player player' 'src explain explain' 'src script stack' 'src . .';
+    /* the script column stops at 560px: spare width goes to both sides, not into the listing */
+    justify-content: center;
+    width: 100%;
+    max-width: var(--page);
+    margin: 0 auto;
+    box-sizing: border-box;
+  }
+  main.explore .left, main.explore .center { display: contents; }
+  main.explore .src-col { grid-area: src; align-self: start; box-sizing: border-box; display: flex; flex-direction: column; gap: 12px; }
+  /* as tall as the script, up to the window bottom, then it scrolls */
+  main.explore .left .grow { grid-area: script; align-self: start; max-height: calc(100% - var(--pad)); margin: 0 0 var(--pad) var(--pad); box-sizing: border-box; }
+  main.explore .explain { grid-area: explain; margin: 0 var(--pad); }
+  /* the player is the run frame's top row: it steps what is below it */
+  main.explore .stepbar { grid-area: player; margin: var(--pad) var(--pad) 0; padding: 0; border: 0; }
+  /* the stack is as tall as the run's deepest point (--rows, app.js), not the
+     whole column: a huge well reads badly */
+  main.explore .stacks { grid-area: stack; align-self: start; max-height: calc(100% - var(--pad)); margin: 0 var(--pad) var(--pad) 0; grid-template-columns: minmax(0, 1fr); }
+  body.alt-on main.explore { grid-template-columns: minmax(300px, 460px) minmax(220px, 560px) minmax(420px, 972px); }
+  /* grouped rows (pkh(C) = 5 ops) want a wider listing than one op per line */
+  body.script-grouped main.explore { grid-template-columns: minmax(300px, 460px) minmax(380px, 560px) minmax(260px, 480px); }
+  body.script-grouped.alt-on main.explore { grid-template-columns: minmax(300px, 420px) minmax(380px, 560px) minmax(400px, 972px); }
+  /* the alt stack as wide as the stack: 2 x 480 + gap at most */
+  body.alt-on main.explore .stacks { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  /* one height for every example (the deepest, P2WSH, needs 9 rows with the
+     spare one): switching examples must not resize the stack; only a deeper
+     custom script makes it taller */
+  main.explore .well { height: calc(max(var(--rows, 4), 9) * 39px + 20px); }
+  main.explore { --pad: 8px; }
+  main.explore .run-frame { display: block; grid-area: 1 / 2 / 4 / 4; }
+}
+
+/* touch screens: no keyboard, so header hotkey hints only take room */
+@media (pointer: coarse) {
+  header kbd, #explain kbd, .src-head kbd, .help { display: none; }
+}
+
+@media (max-width: 860px) {
+  body { height: auto; min-height: 100vh; }
+  /* align-content: start - short content must not stretch the rows */
+  main { grid-template-columns: minmax(0, 1fr); overflow: visible; align-content: start; }
+  .stackbox { max-height: none; }
+  .hdr { gap: 10px; }
+  .controls > button { padding: 8px 11px; }
+  /* step bar is a footer on phones: last in body's flex column, stuck to the
+     bottom edge; step buttons are its bottom row, nearest the thumb */
+  .stepbar {
+    position: sticky;
+    bottom: 0;
+    z-index: 2;
+    order: 1;
+    background: var(--bg);
+    border-bottom: 0;
+    border-top: 1px solid var(--line);
+    padding-bottom: max(8px, env(safe-area-inset-bottom));
+  }
+  .timeline { flex-basis: 100%; order: -1; }
+  /* folded source: the head's margin is gone, the spend path keeps its distance */
+  body.src-folded .paths { margin: 8px 0 0; }
+  .site-foot { display: none; }
+  /* a sideways swipe must not turn into the browser's back / forward gesture */
+  html, body { overscroll-behavior-x: none; }
+  .stepbar { touch-action: pan-x pan-y; }
+  /* inside main now: last grid row, out to the screen edges over main's padding */
+  main.explore .stepbar { grid-area: 4 / 1; margin: 0 -16px -12px; }
+  .toggles { margin-left: 0; }
+  /* theme button: icon only, flows into the mode row instead of squeezing it */
+  .hdr { display: contents; }
+  .theme { min-width: 0; }
+  .theme-name { display: none; }
+  /* no alt stack on phones (app.js): no toggle either */
+  .toggle.flag-altStack { display: none !important; }
+  /* explore order: source, step card, then script | stack side by side;
+     .left / .center dissolve into main's grid */
+  .left, .center, .src-col { display: contents; }
+  .spend-panel, .cost-panel { display: none; }
+  /* explicit rows: the frame's cells must not push the others down in auto placement */
+  .src { order: 1; grid-area: 1 / 1; }
+  .explain { order: 2; grid-area: 2 / 1; margin: var(--pad) var(--pad) 0; }
+  main.explore { --pad: 6px; }
+  main.explore .run-frame { display: block; grid-area: 2 / 1 / 4 / 2; }
+  /* the bench's height is set by the stack (or its min-height), never by the
+     script: the strip is absolutely placed and scrolls inside itself */
+  .bench { display: grid; order: 3; grid-area: 3 / 1; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); gap: 8px; min-height: 300px; margin: 0 var(--pad) var(--pad); }
+  /* the bench takes whatever height is left above the footer (at least 300px) */
+  main.explore { grid-template-rows: auto auto minmax(300px, 1fr); align-content: stretch; }
+  /* the stack fills its column: as tall as the script next to it, so it
+     scrolls only when the run is deeper than the bench (then the bench grows) */
+  .bench .stacks { align-self: stretch; grid-template-rows: minmax(0, 1fr); }
+  .bench .stackbox { align-self: stretch; }
+  .strip-panel { display: block; position: relative; padding: 0; }
+  .strip { position: absolute; inset: 0; max-height: none; padding: 6px; flex-direction: column; flex-wrap: nowrap; gap: 2px; }
+  .strip { overflow-x: hidden; }
+  /* a listing, not tokens: only the start, the current op and an error get a frame */
+  .strip li { flex: none; padding: 1px 6px 1px calc(6px + var(--depth, 0) * 10px); border-color: transparent; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .strip li.start { border-color: var(--line); }
+  .strip li.start { margin: 0 0 4px; }
+  .strip li.phase { flex-basis: auto; padding: 2px 0; }
+  /* the column next to the stack is the script on phones: no second listing */
+  .left .grow { display: none; }
+  /* labels are enough on a narrow stack; unnamed data is labelled by its short hex */
+  .item .hex { display: none; }
+  .fold { display: inline-block; }
+  body.src-folded .src-body { display: none; }
+  body.src-folded .src-head { margin-bottom: 0; }
+  main.explore { touch-action: pan-y; }
+  /* step card, script and the whole stack on one screen: compact
+     stack rows, no spare row in the well, no timeline in the footer
+     (swipes and buttons step; the ticks are too small for a finger) */
+  .stepbar .timeline { display: none; }
+  .result .msg { display: none; }
+  /* fixed heights within one example: stepping must not move the stack.
+     The step card and the strip scroll inside themselves when text is long */
+  #explain { height: 110px; overflow-y: auto; }
+  #explain:not(.expanded) .desc { display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden; cursor: pointer; }
+  /* ▾ / ▴ next to a cut-off description: it can be tapped open */
+  #explain .op-line { display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: 8px; }
+  #explain .op-title { grid-column: 1 / -1; }
+  #explain.clamped .more, #explain.expanded .more { display: block; color: var(--accent); cursor: pointer; }
+  #explain.clamped .more::before { content: '▾'; }
+  #explain.expanded .more::before { content: '▴'; }
+  main.explore { gap: 8px; padding-top: 8px; }
+  .stack { --gap: 3px; }
+  .item { padding: 3px 8px; }
+  /* row = item (~28.3px) + 3px gap, rounded up; + padding 12px + bottom border 2px */
+  .well { height: auto; flex: 1 0 auto; min-height: calc((var(--rows, 4) - 1) * 32px + 14px); padding: 6px; }
+  .stackbox h2 { margin-bottom: 4px; }
+  .empty-stack { padding: 6px; }
+  .stackbox { padding: 8px 10px 4px; }
+}
+
+/* the input as sent, cost and limits (desktop, under the source) */
+body.no-cost .spend-panel, body.no-cost .cost-panel, body.blocked .spend-panel, body.blocked .cost-panel { display: none; }
+.spend-items { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.spend-items li { display: grid; grid-template-columns: 22px minmax(0, 1fr) auto; align-items: center; gap: 8px; font-size: 13px; }
+.spend-i { color: var(--muted); font: 11px var(--mono); text-align: right; }
+.spend-b { color: var(--muted); font: 12px var(--mono); }
+.spend-items .chipx { justify-self: start; }
+.spend-items li.is-script .chipx { border-style: dashed; }
+.spend-note { grid-column: 2 / -1; font-size: 12px; color: var(--muted); font-style: italic; }
+.spend-size { margin-top: 8px; font-size: 13px; color: var(--muted); }
+.spend-size b { color: var(--text); font-family: var(--mono); font-weight: 600; }
+.cost { width: 100%; border-collapse: collapse; font-size: 13px; }
+.cost th { text-align: right; font-weight: 600; color: var(--muted); font-size: 12px; padding: 2px 6px; cursor: help; }
+.cost th:first-child { text-align: left; }
+.cost td { text-align: right; padding: 3px 6px; font-family: var(--mono); }
+.cost td.cost-name { text-align: left; font-family: inherit; }
+.cost tbody tr { cursor: pointer; }
+.cost tbody tr:hover { background: color-mix(in srgb, var(--text) 6%, transparent); }
+.cost tbody tr.current { background: color-mix(in srgb, var(--accent) 14%, transparent); }
+.cost .ok { color: var(--ok); }
+.cost .fail { color: var(--fail); }
+.limits { list-style: none; margin: 10px 0 0; padding: 8px 0 0; border-top: 1px solid var(--line); display: flex; flex-direction: column; gap: 3px; font-size: 13px; }
+.limits li { display: grid; grid-template-columns: minmax(0, 1fr) auto 76px; gap: 8px; }
+.lim-v { font-family: var(--mono); text-align: right; }
+.lim-rule { font-size: 11px; color: var(--muted); text-align: right; }
+.limits li.over .lim-v, .limits li.over span:first-child { color: var(--fail); }

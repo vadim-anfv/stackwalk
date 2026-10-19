@@ -1,0 +1,261 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>stackwalk</title>
+  <link rel="stylesheet" href="style.css">
+  <!-- apply a saved theme before first paint (no flash); logic lives in app.js -->
+  <script>
+    try {
+      const t = localStorage.getItem('stackwalk.theme');
+      if (t === 'light' || t === 'dark') document.documentElement.dataset.theme = t;
+    } catch {}
+  </script>
+</head>
+<body>
+  <header>
+    <div class="brand">stack<span>walk</span></div>
+    <!-- explore alone needs no switch: hidden with one view (style.css) -->
+    <div class="seg views" id="view" role="tablist" aria-label="View">
+      <button data-view="explore">explore</button>
+      <!-- flag:train -->
+      <button data-view="train">train</button>
+      <!-- /flag:train -->
+    </div>
+    <div class="explore-only hdr">
+      <div class="seg" id="mode" role="group" aria-label="Mode">
+        <button data-mode="miniscript">descriptor <kbd>D</kbd></button>
+        <button data-mode="script">script only <kbd>S</kbd></button>
+      </div>
+      <!-- phone: the toggles live here; desktop: app.js moves each into its .toggle-slot -->
+      <div class="toggles" id="toggles">
+        <label class="toggle" title="Allow named test keys (A, B…) instead of real public keys. Signatures are symbolic; Bitcoin Core would reject such a descriptor."><input type="checkbox" id="keys-toggle"> test keys <kbd>K</kbd></label>
+        <label class="toggle flag-altStack" title="Show the alt stack. When off, scripts using OP_TOALTSTACK / OP_FROMALTSTACK are refused."><input type="checkbox" id="alt-toggle"> alt stack <kbd>A</kbd></label>
+        <label class="toggle" title="Quiz yourself: after each step the new stack is hidden until you reveal it (Space)."><input type="checkbox" id="predict"> predict <kbd>P</kbd></label>
+      </div>
+    </div>
+    <button id="theme" class="theme"></button>
+    <button id="help" class="help" title="Keyboard shortcuts (?)" aria-label="Keyboard shortcuts">?</button>
+    <!-- TODO: the repo link once it exists; for now the profile -->
+    <a class="code-link" href="https://github.com/vadim-anfv" target="_blank" rel="noopener" title="Source code on GitHub" aria-label="Source code on GitHub">
+      <svg viewBox="0 0 16 16" width="18" height="18" aria-hidden="true"><path fill="currentColor" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
+    </a>
+  </header>
+
+  <!-- keyboard shortcuts: ? or the header button; Esc, a click outside or × closes -->
+  <dialog id="help-dlg" class="help-dlg" tabindex="-1">
+    <div class="help-head"><h2>keyboard shortcuts</h2><button id="help-close" aria-label="Close">×</button></div>
+    <div class="help-cols">
+      <section>
+        <h3>explore</h3>
+        <dl>
+          <dt><kbd>→</kbd> <kbd>l</kbd></dt><dd>next step</dd>
+          <dt><kbd>←</kbd> <kbd>h</kbd></dt><dd>previous step</dd>
+          <dt><kbd>Home</kbd> <kbd>End</kbd></dt><dd>first / last step</dd>
+          <dt><kbd>Space</kbd></dt><dd>next step, or reveal the stack in predict</dd>
+          <dt><kbd>E</kbd></dt><dd>edit the source: the first field with text</dd>
+          <dt><kbd>Enter</kbd></dt><dd>in a source field: compile and leave it</dd>
+          <dt><kbd>Shift</kbd>+<kbd>Enter</kbd></dt><dd>in a source field: new line</dd>
+          <dt><kbd>Esc</kbd></dt><dd>leave the source field</dd>
+          <dt><kbd>D</kbd> <kbd>S</kbd></dt><dd>descriptor / script mode</dd>
+          <dt><kbd>K</kbd></dt><dd>test keys on / off</dd>
+          <dt class="flag-altStack"><kbd>A</kbd></dt><dd class="flag-altStack">alt stack on / off</dd>
+          <dt><kbd>P</kbd></dt><dd>predict on / off</dd>
+          <dt><kbd>?</kbd></dt><dd>this list</dd>
+        </dl>
+      </section>
+      <!-- flag:train -->
+      <section class="flag-train">
+        <h3>train</h3>
+        <dl>
+          <dt><kbd>Enter</kbd></dt><dd>check the answer, then the next task</dd>
+          <dt><kbd>Ctrl</kbd>+<kbd>Enter</kbd></dt><dd>skip to the next task</dd>
+          <dt><kbd>Tab</kbd></dt><dd>take the suggestion</dd>
+          <dt><kbd>↑</kbd> <kbd>↓</kbd></dt><dd>move through suggestions</dd>
+          <dt><kbd>Esc</kbd></dt><dd>close the suggestions</dd>
+        </dl>
+      </section>
+      <!-- /flag:train -->
+    </div>
+  </dialog>
+
+  <main class="explore-only explore">
+    <!-- one frame behind the step card, the script and the stack: they show the same step -->
+    <div class="run-frame" aria-hidden="true"></div>
+    <!-- desktop: the top row of the run frame; phone: a footer stuck to the bottom -->
+    <nav class="stepbar">
+      <div class="controls">
+        <button id="first" title="First (Home)">⏮</button>
+        <button id="prev" title="Back (← or h)">◀</button>
+        <button id="next" title="Step (→ or l)">▶</button>
+        <button id="play" class="play" title="Play the whole run (any step key stops it)">▷</button>
+        <button id="last" title="Last (End)">⏭</button>
+        <span id="counter" class="muted counter"></span>
+        <div id="timeline" class="timeline" title="← → / h l step · Home End"></div>
+        <span id="result" class="result"></span>
+        <span class="toggle-slot" data-toggle="predict"></span>
+      </div>
+    </nav>
+    <section class="left">
+      <!-- desktop: one column under the source -->
+      <div class="src-col">
+      <div class="panel src">
+        <div class="src-head">
+          <h2>source <kbd title="Edit the source (E)">E</kbd></h2>
+          <label class="example"><span class="k">example</span><select id="scenario" aria-label="Example"></select></label>
+          <span class="toggle-slot" data-toggle="keys-toggle"></span>
+          <button id="src-fold" class="fold" aria-label="Show or hide the source fields"></button>
+        </div>
+        <!-- which spend path runs: outside .src-body, so a folded source (phone) still shows it -->
+        <div class="paths">
+          <label for="paths" class="k">spend path</label>
+          <select id="paths"></select>
+        </div>
+        <div class="src-body">
+        <div class="field ms-only">
+          <label for="in-policy" class="k">policy</label>
+          <textarea id="in-policy" class="src-input" data-kind="policy" rows="1" spellcheck="false" autocomplete="off" autocorrect="off" autocapitalize="off" placeholder="and(pk(A),pk(B))"></textarea>
+        </div>
+        <div id="flow" class="flow ms-only"></div>
+        <div class="field ms-only">
+          <label for="in-miniscript" class="k">miniscript</label>
+          <textarea id="in-miniscript" class="src-input" data-kind="miniscript" rows="1" spellcheck="false" autocomplete="off" autocorrect="off" autocapitalize="off" placeholder="and_v(v:pk(A),pk(B))"></textarea>
+        </div>
+        <!-- what the policy / miniscript is wrapped in; changing it recompiles -->
+        <div class="field ms-only wrap-field">
+          <label for="wrap" class="k">output</label>
+          <select id="wrap" class="wrap">
+            <option value="bare">bare (P2PK, P2MS)</option>
+            <option value="pkh">pkh (P2PKH)</option>
+            <option value="sh">sh (P2SH)</option>
+            <option value="wpkh">wpkh (P2WPKH)</option>
+            <option value="wsh">wsh (P2WSH)</option>
+            <option value="tr" disabled>tr (P2TR), not yet</option>
+          </select>
+        </div>
+        <div id="wrap-warn" class="wrap-warn ms-only" hidden>⚠ not BIP-379: miniscript is specified for wsh and tr only</div>
+        <!-- the whole output: editable too; it names its own output type -->
+        <div class="field ms-only desc-field">
+          <label for="in-descriptor" class="k">descriptor</label>
+          <div class="desc-box">
+            <textarea id="in-descriptor" class="src-input" data-kind="descriptor" rows="1" spellcheck="false" autocomplete="off" autocorrect="off" autocapitalize="off" placeholder="wsh(multi(2,A,B,C))"></textarea>
+            <button id="copy-desc" class="copy-desc" title="Copy the descriptor with its checksum: descriptor#checksum" hidden>copy all</button>
+          </div>
+        </div>
+        <!-- BIP-380 checksum: outside the field, so editing the body never breaks it; copy takes both -->
+        <div id="desc-sum" class="desc-sum ms-only" hidden>
+          <span class="muted">checksum</span><code id="checksum"></code>
+          <span id="sum-note" class="sum-note"></span>
+          <!-- after copy: what went to the clipboard, for a moment, in place of the line -->
+          <span id="copied" class="copied"></span>
+        </div>
+        <div class="field script-only-field">
+          <label for="in-script" class="k">script</label>
+          <textarea id="in-script" class="src-input" data-kind="script" rows="1" spellcheck="false" autocomplete="off" autocorrect="off" autocapitalize="off" placeholder="OP_DUP OP_HASH160 …"></textarea>
+        </div>
+        <div id="src-msg" class="src-msg"></div>
+        <div class="row ms-only"><span class="k">opcode map</span><code id="miniscript" title="Hover or tap a fragment to see its opcodes"></code></div>
+        <!-- phone only: opcodes of the tapped fragment (the script list is off screen) -->
+        <div id="frag-ops" class="frag-ops" hidden></div>
+        <!-- real keys of the input: built as test keys of these names (we can't sign for them) -->
+        <div id="keys-row" class="row ms-only" hidden><span class="k">keys</span><div><code id="keys"></code><div class="keys-note">signed with test keys of these names: script bytes and signatures are not the real ones</div></div></div>
+        <div class="row"><span class="k">scriptPubKey</span><code id="spk"></code></div>
+        <div id="about" class="about"></div>
+        </div>
+      </div>
+      <!-- desktop only: the input as sent for this path, and what each path costs -->
+      <div class="panel spend-panel">
+        <h2><span id="spend-title">witness</span> <span class="muted">as sent</span></h2>
+        <ol id="spend-items" class="spend-items"></ol>
+        <div id="spend-size" class="spend-size"></div>
+      </div>
+      <div class="panel cost-panel">
+        <h2>cost and limits</h2>
+        <table id="cost" class="cost"></table>
+        <ul id="limits" class="limits"></ul>
+      </div>
+      </div>
+      <div class="panel grow">
+        <div class="script-head"><h2>script</h2><button id="script-view" class="link-btn" hidden></button></div>
+        <ol id="script" class="script"></ol>
+      </div>
+    </section>
+
+    <section class="center">
+      <div class="panel explain" id="explain"></div>
+      <!-- phone: script and stack side by side; desktop: dissolves, stack only -->
+      <div class="bench">
+      <!-- phone only: the script as a compact column next to the stack -->
+      <div class="panel strip-panel"><ol id="strip" class="strip"></ol></div>
+      <div class="stacks">
+        <div class="panel stackbox">
+          <h2>stack <span class="muted">top ↑</span><span class="toggle-slot" data-toggle="alt-toggle"></span></h2>
+          <div class="well"><div id="stack" class="stack"></div></div>
+        </div>
+        <div class="panel stackbox side flag-altStack">
+          <h2>alt stack <span class="muted">top ↑</span></h2>
+          <div class="well"><div id="alt" class="stack"></div></div>
+        </div>
+      </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- flag:train -->
+  <main class="train-only train">
+    <section class="t-main">
+      <div class="panel task">
+        <div class="task-head">
+          <span class="k">write the Script for</span>
+          <span class="muted"><span id="t-level"></span> · <span id="t-timer">0.0s</span></span>
+        </div>
+        <code id="t-ms" class="t-ms"></code>
+      </div>
+
+      <div class="panel">
+        <div id="t-palette" class="palette"></div>
+        <textarea id="t-input" rows="3" spellcheck="false" autocomplete="off" autocorrect="off" autocapitalize="off" placeholder="type ops with spaces: aliases, full names, keys like A, numbers"></textarea>
+        <div id="t-suggest" class="suggest"></div>
+        <div id="t-preview" class="toks preview"></div>
+        <div class="t-actions">
+          <button id="t-check">check <kbd>Enter</kbd></button>
+          <button id="t-answer">show answer</button>
+          <button id="t-next">skip <kbd>Ctrl+Enter</kbd></button>
+        </div>
+      </div>
+
+      <div id="t-result" class="panel t-result"></div>
+    </section>
+
+    <aside class="t-side">
+      <div class="panel">
+        <h2>session</h2>
+        <div id="t-stats" class="stats"></div>
+      </div>
+      <div class="panel flag-leaderboard">
+        <div class="board-head">
+          <h2>leaderboard</h2>
+          <div class="seg small" id="t-board-tabs">
+            <button data-board="today">today</button>
+            <button data-board="week">week</button>
+            <button data-board="all">all time</button>
+          </div>
+        </div>
+        <table id="t-board" class="board"></table>
+      </div>
+      <div class="panel">
+        <h2>aliases</h2>
+        <div id="t-cheats" class="cheats"></div>
+      </div>
+    </aside>
+  </main>
+  <!-- /flag:train -->
+
+
+  <!-- desktop only: phones keep the bottom for the step bar -->
+  <footer class="site-foot"><a href="https://vadim.rs">vadim.rs</a></footer>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>

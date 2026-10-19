@@ -1,0 +1,508 @@
+//! Request -> Scenario: parse input, build scripts, enumerate paths, sign, trace.
+use std::str::FromStr;
+
+use miniscript::bitcoin::{PublicKey, ScriptBuf, Sequence, absolute};
+use miniscript::descriptor::{ShInner, WshInner, checksum};
+use miniscript::policy::Concrete;
+use miniscript::{BareCtx, Descriptor, ForEachKey, Legacy, Miniscript, ScriptContext, Segwitv0, Terminal};
+
+use crate::keys::{KeyRing, NameTranslator};
+use crate::model::{CompileReq, Ins, KeyAlias, PathInfo, Scenario, Trace};
+use crate::real_keys;
+use crate::paths::{self, PathSpec};
+use crate::sat::{Sat, SigCtx, dummy_tx};
+use crate::scriptexec::ExecCtx;
+use crate::script_parse;
+use crate::spend::{Field, spend_data};
+use crate::trace::{Initial, Runner, ins_list, script_text};
+use crate::tree;
+
+pub fn compile(req: &CompileReq) -> Result<Scenario, String> {
+    let mut text = req.text.trim();
+    if req.kind == "script" {
+        return build(req, text);
+    }
+    if req.kind == "descriptor" {
+        // a pasted checksum is verified against the text as typed (real keys included)
+        text = checksum::verify_checksum(text).map_err(|e| match e {
+            checksum::Error::InvalidChecksum { actual, expected } => format!(
+                "checksum mismatch: got #{}, expected #{} (a typo in the descriptor?)",
+                String::from_iter(actual),
+                String::from_iter(expected)
+            ),
+            e => format!("descriptor: {e}"),
+        })?;
+    }
+    // real keys are built as test keys under free names, and shown as themselves again
+    let (aliased, aliases) = real_keys::alias(text)?;
+    let mut sc = build(req, &aliased)?;
+    // a descriptor that does not parse back (non-standard bare miniscript) is no wallet's either
+    sc.importable = sc.descriptor.as_deref().and_then(|d| Descriptor::<String>::from_str(d).ok())
+        .is_some_and(|d| d.for_each_key(|k| aliases.iter().any(|(name, _)| name == k)));
+    for s in [&mut sc.policy, &mut sc.miniscript, &mut sc.descriptor].into_iter().flatten() {
+        *s = real_keys::restore(s, &aliases);
+    }
+    if let Some(d) = &sc.descriptor {
+        let mut eng = checksum::Engine::new();
+        eng.input(d).map_err(|e| format!("descriptor: {e}"))?;
+        sc.checksum = Some(eng.checksum());
+    }
+    sc.keys = aliases.into_iter().map(|(name, key)| KeyAlias { name, key }).collect();
+    Ok(sc)
+}
+
+fn build(req: &CompileReq, text: &str) -> Result<Scenario, String> {
+    let mut ring = KeyRing::new();
+    match req.kind.as_str() {
+        kind @ ("policy" | "miniscript") => match target(req.wrap.as_deref())? {
+            Target::Ms(Wrap::Wsh) => build_in::<Segwitv0>(&mut ring, Wrap::Wsh, kind, text),
+            Target::Ms(Wrap::Sh) => build_in::<Legacy>(&mut ring, Wrap::Sh, kind, text),
+            Target::Ms(Wrap::Bare) => build_in::<BareCtx>(&mut ring, Wrap::Bare, kind, text),
+            Target::Pkh { segwit } => {
+                let key = if kind == "policy" {
+                    match Concrete::<String>::from_str(text).map_err(|e| format!("policy: {e}"))? {
+                        Concrete::Key(k) => Some(k),
+                        _ => None,
+                    }
+                } else {
+                    let ms = Miniscript::<String, Segwitv0>::from_str(text).map_err(|e| format!("miniscript: {e}"))?;
+                    single_key(&ms).cloned()
+                };
+                let key = key.ok_or("pkh / wpkh take a single key, e.g. pk(A)")?;
+                let mut sc = build_pkh(&mut ring, &key, segwit);
+                if kind == "policy" {
+                    sc.policy = Some(text.to_string());
+                }
+                Ok(sc)
+            }
+        },
+        "descriptor" => descriptor(&mut ring, text),
+        "script" => {
+            let script = script_parse::parse(&mut ring, text)?;
+            match script_parse::as_miniscript(&ring, &script) {
+                Some(ms) => build_ms(&mut ring, Wrap::Wsh, &ms, None, false),
+                None => Ok(build_raw(&mut ring, script)),
+            }
+        }
+        k => Err(format!("unknown kind {k:?}: expected policy, miniscript, descriptor or script")),
+    }
+}
+
+fn descriptor(ring: &mut KeyRing, text: &str) -> Result<Scenario, String> {
+    let lower = text.to_ascii_lowercase();
+    if lower.starts_with("tr(") || lower.starts_with("rawtr(") {
+        return Err("taproot is not supported yet".into());
+    }
+    let d = Descriptor::<String>::from_str(text).map_err(|e| format!("descriptor: {e}"))?;
+    match d {
+        Descriptor::Bare(b) => {
+            let ms: &Miniscript<String, BareCtx> = b.as_inner();
+            build_ms(ring, Wrap::Bare, ms, None, is_pk(ms))
+        }
+        Descriptor::Pkh(p) => Ok(build_pkh(ring, p.as_inner(), false)),
+        Descriptor::Wpkh(w) => Ok(build_pkh(ring, w.as_inner(), true)),
+        Descriptor::Sh(sh) => match sh.as_inner() {
+            ShInner::Ms(ms) => build_ms::<Legacy>(ring, Wrap::Sh, ms, None, false),
+            ShInner::Wsh(_) | ShInner::Wpkh(_) => Err("nested sh(wsh(...)) / sh(wpkh(...)) is not supported yet".into()),
+            ShInner::SortedMulti(_) => Err("sortedmulti is not supported yet".into()),
+        },
+        Descriptor::Wsh(w) => match w.as_inner() {
+            WshInner::Ms(ms) => build_ms(ring, Wrap::Wsh, ms, None, false),
+            WshInner::SortedMulti(_) => Err("sortedmulti is not supported yet".into()),
+        },
+        Descriptor::Tr(_) => Err("taproot is not supported yet".into()),
+    }
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Wrap {
+    Bare,
+    Sh,
+    Wsh,
+}
+
+impl Wrap {
+    fn name(self) -> &'static str {
+        match self {
+            Wrap::Bare => "bare",
+            Wrap::Sh => "sh",
+            Wrap::Wsh => "wsh",
+        }
+    }
+}
+
+/// Output type a policy / miniscript is built for (the request's `wrap`).
+enum Target {
+    Ms(Wrap),
+    /// the pkh / wpkh templates: a single key, no miniscript of its own
+    Pkh { segwit: bool },
+}
+
+fn target(wrap: Option<&str>) -> Result<Target, String> {
+    match wrap.unwrap_or("wsh") {
+        "bare" => Ok(Target::Ms(Wrap::Bare)),
+        "sh" => Ok(Target::Ms(Wrap::Sh)),
+        "wsh" => Ok(Target::Ms(Wrap::Wsh)),
+        "pkh" => Ok(Target::Pkh { segwit: false }),
+        "wpkh" => Ok(Target::Pkh { segwit: true }),
+        "tr" => Err("taproot is not supported yet".into()),
+        w => Err(format!("unknown wrap {w:?}: expected bare, sh, wsh, pkh, wpkh or tr")),
+    }
+}
+
+/// Compile the policy, or parse the miniscript, in the script context of `wrap`.
+fn build_in<Ctx: ScriptContext>(ring: &mut KeyRing, wrap: Wrap, kind: &str, text: &str) -> Result<Scenario, String> {
+    let (ms, policy) = if kind == "policy" {
+        let pol = Concrete::<String>::from_str(text).map_err(|e| format!("policy: {e}"))?;
+        let ms: Miniscript<String, Ctx> = pol.compile().map_err(|e| format!("compile: {e}"))?;
+        // Display of Concrete shows weights (`1@pk(A)`), so echo the input text instead
+        (ms, Some(text.split_whitespace().collect()))
+    } else {
+        (Miniscript::<String, Ctx>::from_str(text).map_err(|e| format!("miniscript: {e}"))?, None)
+    };
+    let pk_tpl = wrap == Wrap::Bare && is_pk(&ms);
+    build_ms(ring, wrap, &ms, policy, pk_tpl)
+}
+
+/// `pk(X)`: the P2PK template, named "X signs" / "B tries" like pkh
+fn is_pk<Ctx: ScriptContext>(ms: &Miniscript<String, Ctx>) -> bool {
+    matches!(ms.as_inner(), Terminal::Check(c) if matches!(c.as_inner(), Terminal::PkK(_)))
+}
+
+/// The key of `pk(X)` / `pkh(X)`.
+fn single_key<Ctx: ScriptContext>(ms: &Miniscript<String, Ctx>) -> Option<&String> {
+    match ms.as_inner() {
+        Terminal::Check(c) => match c.as_inner() {
+            Terminal::PkK(k) | Terminal::PkH(k) => Some(k),
+            _ => None,
+        },
+        _ => None,
+    }
+}
+
+/// One concrete attempt to spend.
+#[derive(Clone)]
+struct Spend {
+    name: String,
+    fails: bool,
+    spec: PathSpec,
+    sequence: Sequence,
+    lock_time: absolute::LockTime,
+    lie: bool,
+    /// (victim, impostor): the victim's signature is made by the impostor key instead
+    wrong: Option<(String, String)>,
+    reverse_sigs: bool,
+}
+
+impl Spend {
+    fn pass(spec: PathSpec) -> Self {
+        let sequence = spec.older.map(Sequence).unwrap_or(Sequence::ENABLE_RBF_NO_LOCKTIME);
+        let lock_time = spec.after.map(absolute::LockTime::from_consensus).unwrap_or(absolute::LockTime::ZERO);
+        Spend { name: spec.name(), fails: false, spec, sequence, lock_time, lie: false, wrong: None, reverse_sigs: false }
+    }
+
+    fn variant(&self, suffix: &str) -> Self {
+        let mut s = self.clone();
+        s.name = format!("{}: {suffix}", self.name);
+        s.fails = true;
+        s
+    }
+
+    fn timelock_variant(&self) -> Option<Self> {
+        if self.spec.older.is_none() && self.spec.after.is_none() {
+            return None;
+        }
+        let mut s = self.variant("timelock not reached");
+        if let Some(n) = self.spec.older {
+            s.sequence = Sequence(n.saturating_sub(1));
+        }
+        if let Some(n) = self.spec.after {
+            s.lock_time = absolute::LockTime::from_consensus(n.saturating_sub(1));
+        }
+        s.lie = true;
+        Some(s)
+    }
+}
+
+fn fresh_name(used: &[String]) -> String {
+    ["X", "Y", "Z", "W", "V"]
+        .iter()
+        .map(|s| s.to_string())
+        .find(|n| !used.contains(n))
+        .unwrap_or_else(|| (0..).map(|i| format!("X{i}")).find(|n| !used.contains(n)).unwrap())
+}
+
+fn wrong_signer(spend: &Spend, policy_keys: &[String]) -> Option<Spend> {
+    let victim = spend.spec.signers.first()?.clone();
+    let impostor = policy_keys
+        .iter()
+        .find(|k| !spend.spec.signers.contains(k))
+        .cloned()
+        .unwrap_or_else(|| fresh_name(policy_keys));
+    let mut s = spend.variant("wrong signer");
+    s.wrong = Some((victim, impostor));
+    Some(s)
+}
+
+/// Sign, satisfy and replace / reorder signatures for the variant. Returns the stack (bottom first).
+fn witness<Ctx: ScriptContext>(
+    ring: &mut KeyRing,
+    ms: &Miniscript<PublicKey, Ctx>,
+    sp: &Spend,
+    sigctx: &SigCtx,
+    tx: &miniscript::bitcoin::Transaction,
+) -> Option<Vec<Vec<u8>>> {
+    let msg = sigctx.message(tx);
+    let mut sat = Sat::new(sp.sequence, sp.lock_time, sp.lie);
+    for s in &sp.spec.signers {
+        let sig = ring.sign(s, &msg);
+        sat.ecdsa.insert(ring.pubkey(s), sig);
+    }
+    for h in &sp.spec.preimages {
+        let p = ring.preimage(h);
+        sat.add_preimage(p);
+    }
+    let mut stack = ms.satisfy(&sat).ok()?;
+    let sig_bytes: Vec<Vec<u8>> = sat.ecdsa.values().map(|s| s.to_vec()).collect();
+    if let Some((victim, impostor)) = &sp.wrong {
+        let good = sat.ecdsa.get(&ring.pubkey(victim))?.to_vec();
+        let bad = ring.sign(impostor, &msg).to_vec();
+        let pos = stack.iter().position(|e| *e == good)?;
+        stack[pos] = bad;
+    }
+    if sp.reverse_sigs {
+        let idx: Vec<usize> = (0..stack.len()).filter(|i| sig_bytes.contains(&stack[*i])).collect();
+        let vals: Vec<Vec<u8>> = idx.iter().rev().map(|i| stack[*i].clone()).collect();
+        for (i, v) in idx.iter().zip(vals) {
+            stack[*i] = v;
+        }
+    }
+    Some(stack)
+}
+
+fn build_ms<Ctx: ScriptContext>(
+    ring: &mut KeyRing,
+    wrap: Wrap,
+    named: &Miniscript<String, Ctx>,
+    policy: Option<String>,
+    pk_template: bool,
+) -> Result<Scenario, String> {
+    let ms: Miniscript<PublicKey, Ctx> =
+        named.translate_pk(&mut NameTranslator(ring)).map_err(|e| format!("key translation: {e:?}"))?;
+    let inner = ms.encode();
+    let (spk, sigctx) = match wrap {
+        Wrap::Wsh => {
+            ring.label(inner.as_bytes(), "script", "witnessScript".into(), None);
+            let spk = ScriptBuf::new_p2wsh(&inner.wscript_hash());
+            ring.label(&spk.as_bytes()[2..], "hash", "sha256(witnessScript)".into(), None);
+            (spk, SigCtx::SegwitV0(inner.clone()))
+        }
+        Wrap::Sh => {
+            ring.label(inner.as_bytes(), "script", "redeemScript".into(), None);
+            let spk = ScriptBuf::new_p2sh(&inner.script_hash());
+            ring.label(&spk.as_bytes()[2..22], "hash", "hash160(redeemScript)".into(), None);
+            (spk, SigCtx::Legacy(inner.clone()))
+        }
+        Wrap::Bare => (inner.clone(), SigCtx::Legacy(inner.clone())),
+    };
+    let mut ids = 0u64;
+    let (script, offset): (Vec<Ins>, usize) = match wrap {
+        Wrap::Wsh => (ins_list(ring, &inner, &mut ids), 0),
+        Wrap::Bare => (ins_list(ring, &spk, &mut ids), 0),
+        Wrap::Sh => {
+            let mut v = ins_list(ring, &spk, &mut ids);
+            v.push(Ins { op: "PHASE".into(), item: None, label: Some("redeemScript".into()) });
+            let off = v.len();
+            v.extend(ins_list(ring, &inner, &mut ids));
+            (v, off)
+        }
+    };
+    let node = tree::build(&ms, named, offset);
+    let policy_keys: Vec<String> = {
+        let mut v: Vec<String> = Vec::new();
+        for k in named.iter_pk() {
+            if !v.contains(&k) {
+                v.push(k);
+            }
+        }
+        v
+    };
+
+    // paths
+    let sets = paths::enumerate(&ms)?;
+    let mut specs: Vec<PathSpec> = sets.iter().map(|s| PathSpec::from_atoms(ring, s)).collect();
+    // smallest first, then by key order of the policy
+    let rank = |n: &String| policy_keys.iter().position(|k| k == n).unwrap_or(usize::MAX);
+    specs.sort_by_key(|p| {
+        (p.signers.len() + p.preimages.len() + p.older.is_some() as usize + p.after.is_some() as usize, p.signers.iter().map(rank).collect::<Vec<_>>())
+    });
+    let passing: Vec<Spend> = specs.into_iter().map(Spend::pass).collect();
+    let mut spends: Vec<Spend> = Vec::new();
+    let multi_k = match ms.as_inner() {
+        Terminal::Multi(t) => Some(t.k()),
+        _ => None,
+    };
+    if let Some(k) = multi_k {
+        spends.extend(passing.iter().cloned());
+        if let Some(first) = passing.first() {
+            if k >= 2 {
+                let mut v = first.variant("wrong order");
+                v.reverse_sigs = true;
+                spends.push(v);
+            } else if let Some(mut v) = wrong_signer(first, &policy_keys) {
+                let imp = fresh_name(&policy_keys);
+                v.wrong = v.wrong.map(|(vic, _)| (vic, imp));
+                spends.push(v);
+            }
+        }
+    } else if pk_template {
+        for p in &passing {
+            spends.push(p.clone());
+            if let Some(mut v) = wrong_signer(p, &policy_keys) {
+                let imp = fresh_name_pref(&policy_keys);
+                v.name = format!("{imp} tries");
+                v.wrong = v.wrong.map(|(vic, _)| (vic, imp));
+                spends.push(v);
+            }
+        }
+    } else {
+        for p in &passing {
+            spends.push(p.clone());
+            spends.extend(p.timelock_variant());
+            spends.extend(wrong_signer(p, &policy_keys));
+        }
+    }
+
+    let mut path_infos = Vec::new();
+    let mut traces = Vec::new();
+    for sp in &spends {
+        let (tx, prevouts) = dummy_tx(&spk, sp.sequence, sp.lock_time);
+        let Some(stack) = witness(ring, &ms, sp, &sigctx, &tx) else { continue };
+        // as sent: the witnessScript / redeemScript follows the stack items
+        let with_script = || stack.iter().cloned().chain([inner.to_bytes()]).collect::<Vec<_>>();
+        let spend = match wrap {
+            Wrap::Wsh => spend_data(ring, Field::Witness, &with_script(), true),
+            Wrap::Sh => spend_data(ring, Field::ScriptSig, &with_script(), true),
+            Wrap::Bare => spend_data(ring, Field::ScriptSig, &stack, false),
+        };
+        let runner = Runner::new(ring, &script, tx, prevouts);
+        let trace: Trace = match wrap {
+            Wrap::Wsh => runner.run_simple(ExecCtx::SegwitV0, &inner, stack, Initial::WitnessBody),
+            Wrap::Bare => runner.run_simple(ExecCtx::Legacy, &spk, stack, Initial::ScriptSig),
+            Wrap::Sh => runner.run_p2sh(&spk, &inner, with_script(), offset - 1),
+        };
+        // a "failing" variant that actually passes is not a useful example: drop it
+        if sp.fails && trace.result.ok {
+            continue;
+        }
+        path_infos.push(PathInfo { name: sp.name.clone(), fails: sp.fails, spend });
+        traces.push(trace);
+    }
+
+    let ms_text = named.to_string();
+    let descriptor = match wrap {
+        Wrap::Bare => ms_text.clone(),
+        Wrap::Sh => format!("sh({ms_text})"),
+        Wrap::Wsh => format!("wsh({ms_text})"),
+    };
+    Ok(Scenario {
+        policy,
+        miniscript: Some(ms_text),
+        descriptor: Some(descriptor),
+        wrap: wrap.name(),
+        // BIP-379 excludes P2SH and bare; pk() (BIP-381) and multi() (BIP-383) are plain descriptors there
+        checksum: None,
+        importable: false,
+        outside_bip379: wrap != Wrap::Wsh && !(is_pk(named) || matches!(named.as_inner(), Terminal::Multi(_))),
+        keys: Vec::new(),
+        spk: script_text(ring, &spk),
+        about: None,
+        tree: Some(node),
+        script,
+        script_bytes: inner.len(),
+        paths: path_infos,
+        traces,
+    })
+}
+
+/// For the pk / pkh / wpkh templates the other signer is "B" (or "A" if the key is B).
+fn fresh_name_pref(used: &[String]) -> String {
+    ["B", "A", "C"].iter().map(|s| s.to_string()).find(|n| !used.contains(n)).unwrap_or_else(|| fresh_name(used))
+}
+
+fn build_pkh(ring: &mut KeyRing, name: &str, segwit: bool) -> Scenario {
+    let pk = ring.pubkey(name);
+    let p2pkh = ScriptBuf::new_p2pkh(&pk.pubkey_hash());
+    let spk = if segwit { ScriptBuf::new_p2wpkh(&pk.wpubkey_hash().expect("compressed")) } else { p2pkh.clone() };
+    let sigctx = if segwit { SigCtx::SegwitV0(p2pkh.clone()) } else { SigCtx::Legacy(p2pkh.clone()) };
+    let mut ids = 0u64;
+    let script = ins_list(ring, &p2pkh, &mut ids);
+    let other = fresh_name_pref(&[name.to_string()]);
+    let mut path_infos = Vec::new();
+    let mut traces = Vec::new();
+    for (pname, signer, fails) in [(format!("{name} signs"), name.to_string(), false), (format!("{other} tries"), other.clone(), true)] {
+        let (tx, prevouts) = dummy_tx(&spk, Sequence::ENABLE_RBF_NO_LOCKTIME, absolute::LockTime::ZERO);
+        let msg = sigctx.message(&tx);
+        let sig = ring.sign(&signer, &msg).to_vec();
+        let stack = vec![sig, pk.to_bytes()];
+        let spend = spend_data(ring, if segwit { Field::Witness } else { Field::ScriptSig }, &stack, false);
+        let runner = Runner::new(ring, &script, tx, prevouts);
+        let trace = if segwit {
+            runner.run_simple(ExecCtx::SegwitV0, &p2pkh, stack, Initial::Witness)
+        } else {
+            runner.run_simple(ExecCtx::Legacy, &p2pkh, stack, Initial::ScriptSig)
+        };
+        path_infos.push(PathInfo { name: pname, fails, spend });
+        traces.push(trace);
+    }
+    Scenario {
+        policy: None,
+        miniscript: None,
+        descriptor: Some(if segwit { format!("wpkh({name})") } else { format!("pkh({name})") }),
+        wrap: if segwit { "wpkh" } else { "pkh" },
+        checksum: None,
+        importable: false,
+        outside_bip379: false,
+        keys: Vec::new(),
+        spk: script_text(ring, &spk),
+        about: None,
+        tree: None,
+        script,
+        // the script code that runs is the P2PKH template, also for wpkh
+        script_bytes: p2pkh.len(),
+        paths: path_infos,
+        traces,
+    }
+}
+
+fn build_raw(ring: &mut KeyRing, script_buf: ScriptBuf) -> Scenario {
+    ring.label(script_buf.as_bytes(), "script", "witnessScript".into(), None);
+    let spk = ScriptBuf::new_p2wsh(&script_buf.wscript_hash());
+    ring.label(&spk.as_bytes()[2..], "hash", "sha256(witnessScript)".into(), None);
+    let mut ids = 0u64;
+    let script = ins_list(ring, &script_buf, &mut ids);
+    let (tx, prevouts) = dummy_tx(&spk, Sequence::ENABLE_RBF_NO_LOCKTIME, absolute::LockTime::ZERO);
+    let trace = Runner::new(ring, &script, tx, prevouts).run_simple(ExecCtx::SegwitV0, &script_buf, vec![], Initial::Empty);
+    let spend = spend_data(ring, Field::Witness, &[script_buf.to_bytes()], true);
+    Scenario {
+        policy: None,
+        miniscript: None,
+        descriptor: None,
+        wrap: "wsh",
+        checksum: None,
+        importable: false,
+        outside_bip379: false,
+        keys: Vec::new(),
+        spk: script_text(ring, &spk),
+        about: None,
+        tree: None,
+        script,
+        script_bytes: script_buf.len(),
+        paths: vec![PathInfo { name: "empty witness".into(), fails: false, spend }],
+        traces: vec![trace],
+    }
+}
+
+#[cfg(test)]
+#[path = "scenario_tests.rs"]
+mod tests;
