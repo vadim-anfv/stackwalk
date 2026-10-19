@@ -28,7 +28,7 @@ use tower_http::services::ServeDir;
 use tower_http::set_header::SetResponseHeaderLayer;
 
 /// Dev only: the browser reloads when a file under `dir` changes, and when the
-/// server comes back after a restart (bacon). No caching, so an edited module
+/// server comes back after a restart (`bacon run-long`). No caching, so an edited module
 /// is fetched again. The watcher must live as long as the server.
 #[cfg(debug_assertions)]
 fn dev_layers(app: Router, dir: &Path) -> (Router, notify::RecommendedWatcher) {
