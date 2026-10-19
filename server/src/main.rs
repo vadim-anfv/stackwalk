@@ -2,6 +2,8 @@
 #[cfg_attr(debug_assertions, allow(dead_code))]
 mod assets;
 mod api;
+#[cfg(test)]
+mod core_vectors;
 mod keys;
 mod metrics;
 mod model;
