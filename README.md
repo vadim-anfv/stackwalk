@@ -24,7 +24,7 @@ cargo test
 - `web/` is the page (plain JS modules, no build step), `server/` the backend (axum, rust-miniscript).
 - Test keys: `A`, `B`, ... are fixed test keys; signatures are over a dummy transaction. Real keys are run as test keys of the same names.
 - `server/src/scriptexec/` is vendored from [rust-bitcoin-scriptexec](https://github.com/BitVM/rust-bitcoin-scriptexec) (CC0) with local changes, listed in its `mod.rs`.
-- PRs welcome; `cargo test` and `cargo clippy --all-targets` should pass.
+- PRs welcome; `cargo test`, `cargo clippy --all-targets` (in `server/`) and `node --test` (in the root) should pass.
 
 ## License
 

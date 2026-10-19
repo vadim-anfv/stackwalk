@@ -1,21 +1,9 @@
 import { renderCost } from './cost.js';
-import { $, esc } from './dom.js';
+import { $, copyText, esc } from './dom.js';
+import { readLink, writeLink } from './link.js';
 import { describe, opText } from './opinfo.js';
+import { initTheme, loadPref, savePref } from './prefs.js';
 import { groups, scenarios } from './scenarios.js';
-
-function loadPref(key, fallback) {
-  try {
-    return localStorage.getItem(`stackwalk.${key}`) ?? fallback;
-  } catch {
-    return fallback;
-  }
-}
-
-function savePref(key, value) {
-  try {
-    localStorage.setItem(`stackwalk.${key}`, value);
-  } catch {}
-}
 
 const state = {
   scenario: 0,
@@ -30,6 +18,7 @@ const state = {
   testKeys: loadPref('testKeys', 'off') === 'on', // opt-in: named keys are not a real descriptor
   blocked: null, // why the script is refused: 'alt' | 'keys' | null
   live: null, // scenario from the backend (API.md); null = nothing compiled yet
+  origin: null, // the typed source `live` was compiled from ({kind, text, wrap}); null for an example
 };
 let reqSeq = 0; // the latest backend request wins
 let trace;
@@ -232,6 +221,7 @@ async function compileField(el) {
   // a pasted checksum checked out: it moves from the field to the line below it
   if (kind === 'descriptor' && el.value.includes('#')) el.value = res.sc.descriptor;
   state.source = kind;
+  state.origin = { kind, text, wrap: state.wrap };
   state.scenario = null; // edited: no longer the example, the picker goes blank
   state.live = { ...res.sc, name: 'custom' };
   if (res.sc.wrap) state.wrap = res.sc.wrap; // a typed descriptor picks the output
@@ -246,6 +236,7 @@ async function compileField(el) {
 async function loadExample(i) {
   const ex = scenarios[i];
   state.scenario = i;
+  state.origin = null;
   state.path = 0;
   state.drafts = {};
   state.source = ex.api.kind === 'script' ? 'policy' : ex.api.kind;
@@ -487,6 +478,7 @@ function render() {
   $('first').disabled = $('prev').disabled = state.step === 0;
   $('next').disabled = $('last').disabled = state.step === last();
   $('play').disabled = last() === 0;
+  updateLink();
 }
 
 // a long script scrolls inside its panel (strip on phones, listing on
@@ -564,21 +556,6 @@ $('wrap').onchange = (e) => {
   $('in-miniscript').value = `pk(${key})`;
   compileField($('in-miniscript'));
 };
-
-// navigator.clipboard exists only in a secure context (https, localhost): over plain
-// http from the LAN it is undefined, so fall back to a selected textarea + execCommand
-async function copyText(text) {
-  if (window.isSecureContext && navigator.clipboard) return navigator.clipboard.writeText(text);
-  const ta = document.createElement('textarea');
-  ta.value = text;
-  ta.setAttribute('readonly', '');
-  ta.style.cssText = 'position:fixed;top:0;left:0;opacity:0';
-  document.body.append(ta);
-  ta.select();
-  const ok = document.execCommand('copy');
-  ta.remove();
-  if (!ok) throw new Error('execCommand copy refused');
-}
 
 $('copy-desc').onclick = async () => {
   const sc = scenario();
@@ -668,25 +645,6 @@ for (const id of Object.values(INPUTS)) {
     }
   });
 }
-
-// auto = follow the system; light / dark pin it (applied early by index.html)
-const THEMES = ['auto', 'light', 'dark'];
-const THEME_ICONS = { auto: '◐', light: '☀', dark: '☾' };
-
-function setTheme(theme) {
-  if (theme === 'auto') delete document.documentElement.dataset.theme;
-  else document.documentElement.dataset.theme = theme;
-  // the name is hidden on narrow screens, the icon stays
-  $('theme').innerHTML = `${THEME_ICONS[theme]}<span class="theme-name"> ${theme}</span>`;
-  $('theme').title = `Theme: ${theme} (auto = system). Click: auto → light → dark`;
-  savePref('theme', theme);
-}
-
-$('theme').onclick = (e) => {
-  const cur = loadPref('theme', 'auto');
-  setTheme(THEMES[(THEMES.indexOf(cur) + 1) % THEMES.length]);
-  e.currentTarget.blur();
-};
 
 // re-run the current example, staying on the same step where possible
 function reload() {
@@ -879,8 +837,52 @@ $('help-dlg').onclick = (e) => {
   if (e.target === e.currentTarget) e.currentTarget.close();
 };
 
-setTheme(THEMES.includes(loadPref('theme')) ? loadPref('theme') : 'auto');
+// --- permalinks (link.js): the URL fragment follows the run, so copying it shares this view ---
+
+let linked = location.hash; // what we wrote last: a hashchange to it is our own
+
+function updateLink() {
+  if (!state.live) return; // nothing compiled yet (or offline): keep the link that came in
+  const at = state.scenario !== null ? { example: scenarios[state.scenario].name } : state.origin && { source: state.origin };
+  if (!at) return;
+  const hash = writeLink({ ...at, path: state.path, step: state.step, mode: state.mode });
+  if (hash === location.hash) return;
+  linked = hash;
+  history.replaceState(null, '', hash);
+}
+
+// open what a link names: compile it, then its path and step, bounded by the run
+async function openLink(link) {
+  setMode(link.mode);
+  if (link.example !== undefined) await loadExample(link.example);
+  else {
+    if (link.source.wrap) state.wrap = link.source.wrap;
+    const el = $(INPUTS[link.source.kind]);
+    el.value = link.source.text;
+    await compileField(el);
+  }
+  if (!state.live) return;
+  const path = Math.min(link.path, Math.max(0, state.live.paths.length - 1));
+  if (path !== state.path) {
+    state.path = path;
+    load();
+  }
+  go(link.step);
+}
+
+const exampleNames = scenarios.map((s) => s.name);
+
+// a link pasted into this tab
+window.addEventListener('hashchange', () => {
+  if (location.hash === linked) return;
+  const link = readLink(location.hash, exampleNames);
+  if (link) openLink(link);
+});
+
+initTheme();
 setSrcFold(loadPref('srcFold', 'on') === 'on');
 load(); // empty first, so there is something to draw while the backend answers
-// start on a wsh example: the output type the policy / miniscript fields are made for
-loadExample(Math.max(0, scenarios.findIndex((s) => s.name.startsWith('P2WSH'))));
+// a link opens its view; else start on a wsh example (the output type the policy / miniscript fields are made for)
+const opened = readLink(location.hash, exampleNames);
+if (opened) openLink(opened);
+else loadExample(Math.max(0, scenarios.findIndex((s) => s.name.startsWith('P2WSH'))));
