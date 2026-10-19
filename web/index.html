@@ -110,8 +110,9 @@
           <label for="scenario" class="k">example</label>
           <select id="scenario"></select>
         </div>
-        <!-- which spend path runs: outside .src-body, so a folded source (phone) still shows it -->
-        <div class="paths">
+        <!-- phone: which spend path runs, outside .src-body so a folded source still shows it;
+             desktop: the spend paths panel picks it -->
+        <div class="paths path-row">
           <label for="paths" class="k">spend path</label>
           <select id="paths"></select>
         </div>
@@ -172,15 +173,19 @@
         <div id="about" class="about"></div>
         </div>
       </div>
-      <!-- desktop only: the input as sent for this path, and what each path costs -->
+      <!-- desktop only: the spend paths with their cost (a row click runs that path; the
+           phone picks it in the source instead), then the input as sent and the limits for it -->
+      <div class="panel cost-panel">
+        <h2>spend paths</h2>
+        <table id="cost" class="cost"></table>
+      </div>
       <div class="panel spend-panel">
         <h2><span id="spend-title">witness</span> <span class="muted">as sent</span></h2>
         <ol id="spend-items" class="spend-items"></ol>
         <div id="spend-size" class="spend-size"></div>
       </div>
-      <div class="panel cost-panel">
-        <h2>cost and limits</h2>
-        <table id="cost" class="cost"></table>
+      <div class="panel limits-panel">
+        <h2>limits <span id="limits-path" class="muted"></span></h2>
         <ul id="limits" class="limits"></ul>
       </div>
       </div>

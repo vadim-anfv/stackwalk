@@ -1,5 +1,5 @@
-// Desktop side panels under the source: the input as sent (witness / scriptSig) for the
-// current spend path, and what every path costs, with the script limits it runs into.
+// Desktop side panels under the source: every spend path with its cost (a row runs it), the
+// input as sent (witness / scriptSig) for the current one and the script limits it runs into.
 
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
 const $ = (id) => document.getElementById(id);
@@ -58,12 +58,13 @@ export function renderCost(sc, pathIdx) {
   const rows = sc.paths.map((p, i) => {
     const tr = sc.traces[i];
     const res = tr.result.ok ? '<span class="ok">✓</span>' : `<span class="fail" title="${esc(tr.result.message)}">✗</span>`;
-    return `<tr data-path="${i}" class="${i === pathIdx ? 'current' : ''}"><td class="cost-name">${esc(p.name)}</td><td>${p.spend.vbytes}</td><td>${tr.ops}</td><td>${peak(tr)}</td><td>${res}</td></tr>`;
+    return `<tr data-path="${i}" class="${i === pathIdx ? 'current' : ''}" title="run this path"><td class="cost-name">${esc(p.name)}</td><td>${p.spend.vbytes}</td><td>${tr.ops}</td><td>${peak(tr)}</td><td>${res}</td></tr>`;
   });
   $('cost').innerHTML =
     '<thead><tr><th>path</th><th title="input size in vbytes">vB</th><th title="opcodes counted toward the 201 limit">ops</th><th title="stack + alt stack at the highest point">stack</th><th></th></tr></thead>' +
     `<tbody>${rows.join('')}</tbody>`;
 
+  $('limits-path').textContent = `for ${path.name}`;
   $('limits').innerHTML = limits(sc, path, t)
     .map(([name, v, max, rule, unit]) => {
       // only a breach is marked: a signature is always 72 of the 80 bytes, that is no warning

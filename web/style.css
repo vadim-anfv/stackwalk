@@ -618,6 +618,7 @@ textarea.src-input { display: block; resize: none; overflow: hidden; overflow-wr
   .stackbox h2 { display: flex; align-items: center; gap: 6px; }
   .stackbox h2 .toggle-slot { margin-left: auto; }
   .keys-slot { padding: 0 0 8px calc(var(--lw) + 8px); }
+  .path-row { display: none; }
   /* panel titles: a bar across the panel, ruled off from the content */
   .panel > h2, .src-head, .script-head { margin: -2px -14px 10px; padding: 0 14px 8px; border-bottom: 1px solid var(--line); }
   .panel > h2, .src-head h2, .script-head h2 { color: color-mix(in srgb, var(--text) 70%, var(--muted)); }
@@ -717,7 +718,7 @@ textarea.src-input { display: block; resize: none; overflow: hidden; overflow-wr
   /* explore order: source, step card, then script | stack side by side;
      .left / .center dissolve into main's grid */
   .left, .center, .src-col { display: contents; }
-  .spend-panel, .cost-panel { display: none; }
+  .spend-panel, .cost-panel, .limits-panel { display: none; }
   /* explicit rows: the frame's cells must not push the others down in auto placement */
   .src { order: 1; grid-area: 1 / 1; }
   .explain { order: 2; grid-area: 2 / 1; margin: var(--pad) var(--pad) 0; }
@@ -774,7 +775,7 @@ textarea.src-input { display: block; resize: none; overflow: hidden; overflow-wr
 }
 
 /* the input as sent, cost and limits (desktop, under the source) */
-body.no-cost .spend-panel, body.no-cost .cost-panel, body.blocked .spend-panel, body.blocked .cost-panel { display: none; }
+body.no-cost :is(.spend-panel, .cost-panel, .limits-panel), body.blocked :is(.spend-panel, .cost-panel, .limits-panel) { display: none; }
 .spend-items { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
 .spend-items li { display: grid; grid-template-columns: 22px minmax(0, 1fr) auto; align-items: center; gap: 8px; font-size: 13px; }
 .spend-i { color: var(--muted); font: 11px var(--mono); text-align: right; }
@@ -794,7 +795,7 @@ body.no-cost .spend-panel, body.no-cost .cost-panel, body.blocked .spend-panel, 
 .cost tbody tr.current { background: color-mix(in srgb, var(--accent) 14%, transparent); }
 .cost .ok { color: var(--ok); }
 .cost .fail { color: var(--fail); }
-.limits { list-style: none; margin: 10px 0 0; padding: 8px 0 0; border-top: 1px solid var(--line); display: flex; flex-direction: column; gap: 3px; font-size: 13px; }
+.limits { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 3px; font-size: 13px; }
 .limits li { display: grid; grid-template-columns: minmax(0, 1fr) auto 76px; gap: 8px; }
 .lim-v { font-family: var(--mono); text-align: right; }
 .lim-rule { font-size: 11px; color: var(--muted); text-align: right; }
