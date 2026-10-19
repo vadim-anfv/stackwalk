@@ -106,7 +106,7 @@ impl Exec {
             self.sighashcache
                 .legacy_signature_hash(
                     self.tx.input_idx,
-                    Script::from_bytes(script_code),
+                    Script::from_bytes(&without_codeseparators(script_code)),
                     hashtype as u32,
                 )
                 .expect("TODO(stevenroose) seems to only happen if prevout index out of bound")

@@ -1,5 +1,6 @@
 //! Engine checks that Core's script_tests.json does not reach.
 use bitcoin::hex::FromHex;
+use bitcoin::secp256k1;
 
 use super::*;
 
@@ -28,6 +29,37 @@ fn run(ctx: ExecCtx, tmpl: TxTemplate, script: Vec<u8>, stack: Vec<Vec<u8>>) -> 
             return res.clone();
         }
     }
+}
+
+fn key() -> (secp256k1::SecretKey, Vec<u8>) {
+    let sk = secp256k1::SecretKey::from_slice(&[7; 32]).expect("key");
+    let pk = sk.public_key(&secp256k1::Secp256k1::new()).serialize().to_vec();
+    (sk, pk)
+}
+
+fn sign(sk: &secp256k1::SecretKey, digest: [u8; 32], hashtype: u8) -> Vec<u8> {
+    let msg = secp256k1::Message::from_digest(digest);
+    let mut sig = secp256k1::Secp256k1::new().sign_ecdsa(&msg, sk).serialize_der().to_vec();
+    sig.push(hashtype);
+    sig
+}
+
+#[test]
+fn legacy_sighash_drops_codeseparators_from_the_script_code() {
+    use bitcoin::hashes::Hash;
+    let (sk, pk) = key();
+    // 0 IF CODESEPARATOR ENDIF <pk> CHECKSIG: the separator is not run, the script code is the
+    // whole script, and Core hashes it with OP_CODESEPARATOR left out
+    let script = [h("0063ab6821"), pk.clone(), h("ac")].concat();
+    let hashed = [h("00636821"), pk, h("ac")].concat();
+    let tmpl = tx(TxOut::NULL);
+    let digest = SighashCache::new(&tmpl.tx)
+        .legacy_signature_hash(0, Script::from_bytes(&hashed), 1)
+        .expect("input 0")
+        .to_byte_array();
+    let res = run(ExecCtx::Legacy, tmpl, script, vec![sign(&sk, digest, 1)]);
+    assert_eq!(res.error, None);
+    assert!(res.success, "the signature over the script code without separators is valid");
 }
 
 #[test]

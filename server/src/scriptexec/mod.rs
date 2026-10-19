@@ -11,7 +11,8 @@
 //! (compressed = 33 bytes with an 02 / 03 prefix, not just "not 65 bytes"); DERSIG, LOW_S and
 //! STRICTENC added (Core's CheckSignatureEncoding / CheckPubKeyEncoding); the 10000-byte script
 //! size limit; DISCOURAGE_UPGRADABLE_NOPS. FindAndDelete as Core's (the push-encoded signature
-//! at opcode boundaries, an empty one too); the stack limit checked after data pushes too.
+//! at opcode boundaries, an empty one too); the stack limit checked after data pushes too; the
+//! legacy sighash hashes the script code without OP_CODESEPARATORs.
 
 use bitcoin::consensus::Encodable;
 use bitcoin::opcodes::{Opcode, all::*};
@@ -555,6 +556,22 @@ fn next_op(script: &[u8], pc: usize) -> Option<usize> {
     };
     let end = pc + 1 + len_bytes + len;
     (end <= script.len()).then_some(end)
+}
+
+/// The legacy sighash serializes the script code without its OP_CODESEPARATORs (Core's
+/// SerializeScriptCode); rust-bitcoin's legacy_signature_hash leaves them in.
+fn without_codeseparators(code: &[u8]) -> Vec<u8> {
+    let mut out = Vec::with_capacity(code.len());
+    let mut pc = 0;
+    while let Some(next) = next_op(code, pc) {
+        if code[pc] != OP_CODESEPARATOR.to_u8() {
+            out.extend_from_slice(&code[pc..next]);
+        }
+        pc = next;
+    }
+    // only a truncated push is left, never reached: Exec::new refuses scripts that do not parse
+    out.extend_from_slice(&code[pc..]);
+    out
 }
 
 /// Core's FindAndDelete: drops `b` wherever it starts at an opcode boundary, in one pass.
