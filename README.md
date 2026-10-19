@@ -10,6 +10,10 @@ Write a Bitcoin spending condition as a policy, miniscript or descriptor (or raw
 
 Live at [vadim.rs/stackwalk](https://vadim.rs/stackwalk) (soon).
 
+## Status
+
+An experimental project, for learning how Bitcoin Script works. The interpreter is not Bitcoin Core's: its results are not checked against Core yet and may differ from consensus. Do not use it to decide whether real coins can be spent, or to build scripts for real funds without checking them elsewhere. It never needs private keys or seeds: do not paste them anywhere on the page.
+
 ## Run locally
 
 You need a recent stable Rust (edition 2024, Rust 1.85 or newer).
