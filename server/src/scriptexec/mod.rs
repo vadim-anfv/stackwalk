@@ -11,7 +11,7 @@
 //! (compressed = 33 bytes with an 02 / 03 prefix, not just "not 65 bytes"); DERSIG, LOW_S and
 //! STRICTENC added (Core's CheckSignatureEncoding / CheckPubKeyEncoding); the 10000-byte script
 //! size limit; DISCOURAGE_UPGRADABLE_NOPS. FindAndDelete as Core's (the push-encoded signature
-//! at opcode boundaries, an empty one too).
+//! at opcode boundaries, an empty one too); the stack limit checked after data pushes too.
 
 use bitcoin::consensus::Encodable;
 use bitcoin::opcodes::{Opcode, all::*};
@@ -476,6 +476,10 @@ impl Exec {
                         return self.fail(ExecError::MinimalData);
                     }
                     self.stack.pushstr(p.as_bytes());
+                    // as Core: the limit holds after every executed opcode, pushes included
+                    if self.opt.enforce_stack_limit && self.stack.len() + self.altstack.len() > MAX_STACK_SIZE {
+                        return self.fail(ExecError::StackSize);
+                    }
                 }
             }
             Instruction::Op(op) => {

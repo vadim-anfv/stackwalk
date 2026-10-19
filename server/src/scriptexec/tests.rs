@@ -7,6 +7,37 @@ fn h(s: &str) -> Vec<u8> {
     Vec::from_hex(s).expect("hex")
 }
 
+/// One input spending `prevout`, one empty output.
+fn tx(prevout: TxOut) -> TxTemplate {
+    let tx = Transaction {
+        version: transaction::Version::ONE,
+        lock_time: bitcoin::absolute::LockTime::ZERO,
+        input: vec![bitcoin::TxIn::default()],
+        output: vec![TxOut { value: prevout.value, script_pubkey: ScriptBuf::new() }],
+    };
+    TxTemplate { tx, prevouts: vec![prevout], input_idx: 0, taproot_annex_scriptleaf: None }
+}
+
+fn run(ctx: ExecCtx, tmpl: TxTemplate, script: Vec<u8>, stack: Vec<Vec<u8>>) -> ExecutionResult {
+    let ids = IdGen::new(0);
+    let entries = stack.into_iter().map(|data| Entry { id: ids.next(), data }).collect();
+    let script = ScriptBuf::from_bytes(script);
+    let mut exec = Exec::new(ctx, Options::default(), tmpl, script, Stack::from_entries(entries, ids)).expect("parses");
+    loop {
+        if let Err(res) = exec.exec_next() {
+            return res.clone();
+        }
+    }
+}
+
+#[test]
+fn data_pushes_count_toward_the_stack_limit() {
+    // 1001 pushes of 0xff: Core fails at the 1001st (STACK_SIZE is checked after every opcode)
+    let script = h(&"01ff".repeat(1001));
+    let res = run(ExecCtx::Legacy, tx(TxOut::NULL), script, vec![]);
+    assert_eq!(res.error, Some(ExecError::StackSize));
+}
+
 /// Core's script_FindAndDelete unit test (src/test/script_tests.cpp, v31.1): (script, delete, expect).
 #[test]
 fn find_and_delete_matches_core() {
