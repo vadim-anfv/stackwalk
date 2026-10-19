@@ -352,6 +352,15 @@ fn a_miniscript_mixing_height_and_time_locks_is_refused() {
 }
 
 #[test]
+fn a_timelock_note_gives_the_real_reason() {
+    // the tx locktime is a height (0) and the script asks for a time: it fails on the kind,
+    // not on "0 < 500000001"
+    let sc = ok("script", "<500000001> OP_CHECKLOCKTIMEVERIFY", None);
+    let step = sc.traces[0].steps.iter().find(|s| s.error.is_some()).expect("it fails");
+    assert!(step.note.contains("kind"), "{}", step.note);
+}
+
+#[test]
 fn script_numbers_are_bounded_as_core_parses_them() {
     // i64::MIN panicked inside rust-bitcoin's push_int; Core's ParseScript takes +-0xffffffff
     for text in ["-9223372036854775808", "<-9223372036854775808>", "4294967296", "<-4294967296>"] {
