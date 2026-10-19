@@ -40,19 +40,13 @@ export const scenarios = [
     api: { kind: 'descriptor', text: 'wsh(multi(2,A,B,C))' },
     about: 'Segwit v0 script hash. The last witness item is the witnessScript; nodes check its sha256 against the program, then run it on the rest.',
   },
-  {
-    group: 'templates',
-    name: 'OP_RETURN (data)',
-    api: { kind: 'script', text: 'OP_RETURN <0x737461636b77616c6b>' },
-    about: 'Data carrier output. Execution stops at OP_RETURN, so it can never be spent; nodes drop it from the UTXO set.',
-  },
   { group: 'miniscript', name: 'A and B', api: { kind: 'policy', text: 'and(pk(A),pk(B))' } },
   { group: 'miniscript', name: 'A and B via alt stack', alt: true, api: { kind: 'miniscript', text: 'and_b(pk(A),a:pk(B))' } },
   { group: 'miniscript', name: 'key + timelocked recovery', api: { kind: 'policy', text: 'or(pk(A),and(pk(B),older(144)))' } },
   { group: 'miniscript', name: 'hash locks', api: { kind: 'policy', text: 'or(and(pk(A),sha256(H)),and(pk(B),older(10)))' } },
   {
     group: 'miniscript',
-    name: 'long script (42 ops)',
+    name: 'long script (31 ops)',
     api: { kind: 'miniscript', text: 'andor(pk(A),or_i(and_v(v:pkh(B),hash160(H)),older(1008)),and_v(v:thresh(2,pkh(C),s:pk(D),s:pk(E)),sha256(H)))' },
   },
 ];

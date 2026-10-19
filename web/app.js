@@ -141,7 +141,7 @@ function treeHtml(node) {
 
 const INPUTS = { policy: 'in-policy', miniscript: 'in-miniscript', descriptor: 'in-descriptor', script: 'in-script' };
 
-// '' when the example has no such form (e.g. OP_RETURN has no policy)
+// '' when the example has no such form (a raw script has no policy)
 function sourceText(sc, kind) {
   if (kind === 'policy') return sc.policy ?? '';
   if (kind === 'miniscript') return sc.miniscript ?? '';
@@ -292,6 +292,11 @@ function renderStatic() {
     if (document.activeElement === el) continue; // don't fight the user's typing
     const draft = state.drafts[kind];
     el.value = draft ?? sourceText(sc, kind);
+    // a typed script runs as wsh: the scriptPubKey (+ redeemScript) of another output is not one
+    if (kind === 'script') {
+      el.readOnly = sc.wrap !== 'wsh';
+      el.title = el.readOnly ? `the scripts of a ${sc.wrap} output: a typed script runs as wsh. Edit it in descriptor mode` : '';
+    }
     el.placeholder = el.value
       ? ''
       : kind === 'miniscript' && ['pkh', 'wpkh'].includes(sc.wrap)
@@ -554,17 +559,30 @@ $('scenario').onchange = (e) => {
 
 // another output type: rebuild from the field the user typed into last; a
 // descriptor names its own wrapper, so then from what is inside it
-$('wrap').onchange = (e) => {
+$('wrap').onchange = async (e) => {
+  const was = state.wrap;
   state.wrap = e.target.value;
   e.target.blur();
   // rebuild from the topmost field that has text; a descriptor's own text names the old output
-  if (state.source === 'policy' && $('in-policy').value.trim()) return compileField($('in-policy'));
-  if ($('in-miniscript').value.trim()) return compileField($('in-miniscript'));
-  // pkh / wpkh have no miniscript: carry their key over as pk(key)
-  const key = /^w?pkh\((.+)\)$/.exec(scenario().descriptor ?? '')?.[1];
-  if (!key) return;
-  $('in-miniscript').value = `pk(${key})`;
-  compileField($('in-miniscript'));
+  let el = null;
+  if (state.source === 'policy' && $('in-policy').value.trim()) el = $('in-policy');
+  else if ($('in-miniscript').value.trim()) el = $('in-miniscript');
+  else {
+    // pkh / wpkh have no miniscript: carry their key over as pk(key)
+    const key = /^w?pkh\((.+)\)$/.exec(scenario().descriptor ?? '')?.[1];
+    if (!key) return;
+    el = $('in-miniscript');
+    el.value = `pk(${key})`;
+  }
+  await compileField(el);
+  // it did not build for that output (pkh of two keys): the run shown is still the old one,
+  // and so is the output type; the error stays under the field
+  if (el.classList.contains('invalid')) {
+    state.wrap = was;
+    e.target.value = was;
+    delete state.drafts[el.dataset.kind];
+    el.classList.remove('invalid');
+  }
 };
 
 $('copy-desc').onclick = async () => {
@@ -648,7 +666,10 @@ for (const id of Object.values(INPUTS)) {
     // Shift+Enter: newline
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
-      compileField(el);
+      // unchanged: nothing to compile (a P2SH script recompiled as wsh was another output)
+      const kind = el.dataset.kind;
+      const changed = el.value !== sourceText(scenario(), kind) || state.drafts[kind] !== undefined;
+      if (changed && !el.readOnly) compileField(el);
       el.blur();
     } else if (e.key === 'Escape') {
       el.blur();

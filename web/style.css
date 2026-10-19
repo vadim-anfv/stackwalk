@@ -261,6 +261,7 @@ textarea.src-input { display: block; resize: none; overflow: hidden; overflow-wr
 .copied.fail { color: var(--fail); }
 .src-input:focus { outline: none; border-color: var(--accent); }
 .src-input.invalid { border-color: var(--fail); }
+.src-input[readonly] { color: var(--muted); border-style: dashed; }
 .src-msg { font-size: 12px; margin: 4px 0; padding-left: calc(var(--lw) + 8px); }
 .src-msg:empty { display: none; }
 .src-sep { height: 1px; background: var(--line); margin: 10px 0; }
