@@ -615,6 +615,10 @@ textarea.src-input { display: block; resize: none; overflow: hidden; overflow-wr
   .stackbox h2 { display: flex; align-items: center; gap: 6px; }
   .stackbox h2 .toggle-slot { margin-left: auto; }
   .keys-slot { padding: 0 0 8px 88px; }
+  /* panel titles: a bar across the panel, ruled off from the content */
+  .panel > h2, .src-head, .script-head { margin: -2px -14px 10px; padding: 0 14px 8px; border-bottom: 1px solid var(--line); }
+  .panel > h2, .src-head h2, .script-head h2 { color: color-mix(in srgb, var(--text) 70%, var(--muted)); }
+  .script-head h2 { margin: 0; }
   /* branches (IF / ELSE) stand out in the listing */
   .script { --indent: 32px; }
   /* room to spare: taller ticks so the mini stacks read */
