@@ -73,7 +73,7 @@ fn real_key(tok: &str, parent: &str) -> Option<Result<(), String>> {
     }
 }
 
-fn short(k: &str) -> String {
+pub fn short(k: &str) -> String {
     if k.chars().count() <= 20 { k.to_string() } else { format!("{}…{}", &k[..10], &k[k.len() - 6..]) }
 }
 

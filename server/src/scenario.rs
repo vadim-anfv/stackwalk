@@ -4,7 +4,7 @@ use std::str::FromStr;
 use miniscript::bitcoin::{PublicKey, ScriptBuf, Sequence, absolute};
 use miniscript::descriptor::{ShInner, WshInner, checksum};
 use miniscript::policy::Concrete;
-use miniscript::{BareCtx, Descriptor, ForEachKey, Legacy, Miniscript, ScriptContext, Segwitv0, Terminal};
+use miniscript::{BareCtx, Descriptor, DescriptorPublicKey, ForEachKey, Legacy, Miniscript, MiniscriptKey, ScriptContext, Segwitv0, Terminal};
 
 use crate::keys::{KeyRing, NameTranslator};
 use crate::model::{CompileReq, Ins, KeyAlias, PathInfo, Scenario, Trace};
@@ -56,6 +56,13 @@ pub fn compile(req: &CompileReq) -> Result<Scenario, String> {
         .is_some_and(|d| d.for_each_key(|k| aliases.iter().any(|(name, _)| name == k)));
     for s in [&mut sc.policy, &mut sc.miniscript, &mut sc.descriptor].into_iter().flatten() {
         *s = real_keys::restore(s, &aliases);
+    }
+    // the run used (compressed) test keys: a real uncompressed key would have passed it, in an
+    // output no node relays a spend of
+    if matches!(sc.wrap, "wsh" | "wpkh")
+        && let Some((_, key)) = aliases.iter().find(|(_, k)| DescriptorPublicKey::from_str(k).is_ok_and(|k| k.is_uncompressed()))
+    {
+        return Err(format!("uncompressed keys are not allowed in segwit ({}): {}", sc.wrap, real_keys::short(key)));
     }
     if let Some(d) = &sc.descriptor {
         let mut eng = checksum::Engine::new();

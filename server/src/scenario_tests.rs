@@ -261,6 +261,27 @@ fn a_script_that_is_not_miniscript_says_why_its_stack_is_empty() {
     assert!(!sc.traces[0].steps[0].note.contains("not a miniscript"));
 }
 
+const UNCOMPRESSED: &str = "0479be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798483ada7726a3c4655da4fbfc0e1108a8fd17b448a68554199c47d08ffb10d4b8";
+
+#[test]
+fn an_uncompressed_key_is_refused_in_segwit() {
+    // it was built as a (compressed) test key, so the run passed and the descriptor came out
+    // "importable", though no node relays a segwit spend with an uncompressed key
+    for (kind, text, wrap) in [
+        ("descriptor", format!("wsh(pk({UNCOMPRESSED}))"), None),
+        ("descriptor", format!("wpkh({UNCOMPRESSED})"), None),
+        ("policy", format!("pk({UNCOMPRESSED})"), Some("wpkh")),
+        ("miniscript", format!("pk({UNCOMPRESSED})"), Some("wsh")),
+    ] {
+        let err = run(kind, &text, wrap).unwrap_err();
+        assert!(err.contains("uncompressed"), "{kind} {text} {wrap:?}: {err}");
+    }
+    // legacy outputs take them
+    let sc = ok("descriptor", &format!("pkh({UNCOMPRESSED})"), None);
+    assert!(sc.importable);
+    assert!(run("descriptor", &format!("sh(pk({UNCOMPRESSED}))"), None).is_ok());
+}
+
 #[test]
 fn a_private_key_is_refused_and_not_repeated() {
     // a WIF key looked like a key name and compiled: it then sat in the page, the URL and history
