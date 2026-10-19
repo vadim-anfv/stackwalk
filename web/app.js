@@ -16,7 +16,7 @@ const state = {
   drafts: {}, // text that failed to compile, kept per field until fixed or an example is picked
   alt: loadPref('alt', 'off') === 'on',
   scriptView: loadPref('scriptView', 'grouped'), // desktop listing: 'grouped' by leaf fragment or 'ops', one per line
-  testKeys: loadPref('testKeys', 'off') === 'on', // opt-in: named keys are not a real descriptor
+  testKeys: loadPref('testKeys', 'on') === 'on', // on by default: every example uses them, a first visit must run
   blocked: null, // why the script is refused: 'alt' | 'keys' | null
   live: null, // scenario from the backend (server/src/model.rs); null = nothing compiled yet
   origin: null, // the typed source `live` was compiled from ({kind, text, wrap}); null for an example
@@ -66,7 +66,7 @@ const BLOCKED = {
     html: (sc) =>
       (sc.keys?.length
         ? `We can't sign for real keys, so ${sc.keys.map((k) => `${esc(shortKey(k.key))} runs as test key ${esc(k.name)}`).join(', ')}: the script bytes and signatures are not the real ones.`
-        : 'This example uses named test keys (A, B…) instead of real public keys, and its signatures are symbolic: not a real descriptor.') +
+        : 'This example uses named test keys (A, B…): fixed keys derived from their names, so the signatures are real but anyone can make them. Fine for learning, not a descriptor for real funds.') +
       ' <button id="keys-on">turn on test keys <kbd>K</kbd></button>',
   },
 };
