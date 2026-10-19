@@ -20,25 +20,6 @@ use crate::scriptexec::{Entry, Exec, ExecCtx, ExecError, IdGen, Options, Stack, 
 
 /// Vectors we knowingly disagree with: (index in the JSON array, why). Prefer fixing.
 const KNOWN_GAPS: &[(usize, &str)] = &[
-    // uncompressed keys in segwit v0 are a policy flag (WITNESS_PUBKEYTYPE), we always refuse them
-    (1116, "Basic P2WSH"),
-    (1117, "Basic P2WPKH"),
-    (1118, "Basic P2SH(P2WSH)"),
-    (1119, "Basic P2SH(P2WPKH)"),
-    (1120, "Basic P2WSH with the wrong key"),
-    (1121, "Basic P2WPKH with the wrong key"),
-    (1122, "Basic P2SH(P2WSH) with the wrong key"),
-    (1123, "Basic P2SH(P2WPKH) with the wrong key"),
-    (1128, "Basic P2WSH with wrong value"),
-    (1129, "Basic P2WPKH with wrong value"),
-    (1130, "Basic P2SH(P2WSH) with wrong value"),
-    (1131, "Basic P2SH(P2WPKH) with wrong value"),
-    (1157, "P2WSH CHECKMULTISIG with first key uncompressed and signing with the first key"),
-    (1158, "P2SH(P2WSH) CHECKMULTISIG first key uncompressed and signing with the first key"),
-    (1161, "P2WSH CHECKMULTISIG with first key uncompressed and signing with the second key"),
-    (1162, "P2SH(P2WSH) CHECKMULTISIG with first key uncompressed and signing with the second key"),
-    (1169, "P2WSH CHECKMULTISIG with second key uncompressed and signing with the second key"),
-    (1170, "P2SH(P2WSH) CHECKMULTISIG with second key uncompressed and signing with the second key"),
 ];
 
 /// Flags our engine or this harness implements; any other flag skips the vector.
@@ -55,6 +36,7 @@ const SUPPORTED: &[&str] = &[
     "WITNESS",
     "CLEANSTACK",
     "SIGPUSHONLY",
+    "WITNESS_PUBKEYTYPE",
     "DISCOURAGE_UPGRADABLE_WITNESS_PROGRAM",
 ];
 
@@ -172,6 +154,7 @@ impl Flags {
             enforce_stack_limit: true,
             verify_nullfail: self.has("NULLFAIL"),
             verify_nulldummy: self.has("NULLDUMMY"),
+            verify_witness_pubkeytype: self.has("WITNESS_PUBKEYTYPE"),
         }
     }
 }

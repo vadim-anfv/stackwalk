@@ -7,7 +7,8 @@
 //! script code starts after OP_CODESEPARATOR, OP_CAT is disabled (the experimental OP_CAT
 //! is gone). Execution stats and other unused API removed. Checked against Core's
 //! script_tests.json (src/core_vectors.rs), which led to: ECDSA signatures parsed lax DER with
-//! S normalized, as Core verifies them.
+//! S normalized, as Core verifies them; WITNESS_PUBKEYTYPE an option, checked as Core does
+//! (compressed = 33 bytes with an 02 / 03 prefix, not just "not 65 bytes").
 
 use std::borrow::Cow;
 
@@ -76,6 +77,8 @@ pub struct Options {
     pub verify_nullfail: bool,
     /// The CHECKMULTISIG dummy element must be empty (BIP147 NULLDUMMY).
     pub verify_nulldummy: bool,
+    /// Segwit v0 public keys must be compressed (WITNESS_PUBKEYTYPE, policy).
+    pub verify_witness_pubkeytype: bool,
 }
 
 impl Default for Options {
@@ -88,6 +91,7 @@ impl Default for Options {
             enforce_stack_limit: true,
             verify_nullfail: true,
             verify_nulldummy: true,
+            verify_witness_pubkeytype: true,
         }
     }
 }
@@ -384,7 +388,9 @@ impl Exec {
         pk: &[u8],
         scriptcode: &[u8],
     ) -> Result<bool, ExecError> {
-        if self.ctx == ExecCtx::SegwitV0 && pk.len() == 65 {
+        // Core's IsCompressedPubKey: 33 bytes with an 02 / 03 prefix
+        let compressed = pk.len() == 33 && matches!(pk[0], 0x02 | 0x03);
+        if self.opt.verify_witness_pubkeytype && self.ctx == ExecCtx::SegwitV0 && !compressed {
             return Err(ExecError::WitnessPubkeyType);
         }
         let ok = self.check_sig_ecdsa(sig, pk, scriptcode);
