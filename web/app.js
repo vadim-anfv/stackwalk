@@ -203,7 +203,9 @@ const OFFLINE = '✗ backend is not running (cd server && bacon)';
 const COMPILE_DELAY = 300;
 let compileTimer;
 
-function setStatus(cls, text) {
+// the message goes under the field it is about: the one being edited
+function setStatus(cls, text, field) {
+  if (field) (field.dataset.kind === 'descriptor' ? $('desc-sum') : field.closest('.field')).after($('src-msg'));
   $('src-msg').className = `src-msg ${cls}`;
   $('src-msg').textContent = text;
 }
@@ -216,7 +218,7 @@ function onSourceInput(e) {
   $('scenario').value = '';
   $('desc-sum').hidden = true; // the descriptor below is about to change: its checksum is stale
   $('copy-desc').hidden = true;
-  setStatus('busy', 'compiling…');
+  setStatus('busy', 'compiling…', e.target);
   compileTimer = setTimeout(() => compileField(e.target), COMPILE_DELAY);
 }
 
@@ -226,11 +228,11 @@ async function compileField(el) {
   const text = cleanSource(kind, el.value);
   if (!text) {
     state.drafts[kind] = el.value;
-    setStatus('', '');
+    setStatus('', '', el);
     return;
   }
   const id = ++reqSeq;
-  setStatus('busy', 'compiling…');
+  setStatus('busy', 'compiling…', el);
   // a descriptor names its own output type; a script is always wsh
   const res = await compile(kind === 'policy' || kind === 'miniscript' ? { kind, text, wrap: state.wrap } : { kind, text });
   if (id !== reqSeq) return; // a newer request (typing, example pick) took over
@@ -238,7 +240,7 @@ async function compileField(el) {
     // keep the text (also after blur) and the last good visualization
     state.drafts[kind] = el.value;
     el.classList.add('invalid');
-    setStatus('warn', res.offline ? OFFLINE : `✗ ${res.error}`);
+    setStatus('warn', res.offline ? OFFLINE : `✗ ${res.error}`, el);
     return;
   }
   state.drafts = {};
@@ -251,7 +253,7 @@ async function compileField(el) {
   if (res.sc.wrap) state.wrap = res.sc.wrap; // a typed descriptor picks the output
   state.path = 0;
   load();
-  setStatus('ok', `✓ compiled${kind === 'script' ? '' : ` from ${kind}`}`);
+  setStatus('ok', '✓ compiled', el);
 }
 
 // pick an example: the backend compiles and runs it

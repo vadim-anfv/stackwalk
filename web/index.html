@@ -159,7 +159,10 @@
           <label for="in-script" class="k">script</label>
           <textarea id="in-script" class="src-input" data-kind="script" rows="1" spellcheck="false" autocomplete="off" autocorrect="off" autocapitalize="off" placeholder="OP_DUP OP_HASH160 …"></textarea>
         </div>
+        <!-- compile status: app.js moves it under the field being edited -->
         <div id="src-msg" class="src-msg"></div>
+        <!-- above: what you type; below: what it builds -->
+        <hr class="src-sep">
         <div class="row ms-only"><span class="k">opcode map</span><code id="miniscript" title="Hover or tap a fragment to see its opcodes"></code></div>
         <!-- phone only: opcodes of the tapped fragment (the script list is off screen) -->
         <div id="frag-ops" class="frag-ops" hidden></div>
