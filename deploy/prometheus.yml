@@ -1,0 +1,6 @@
+# under scrape_configs: in prometheus.yml, on the same host as stackwalk
+# Metrics: stackwalk_requests_total{kind,status}, stackwalk_compile_seconds_sum / _count;
+# up{job="stackwalk"} is whether it answers.
+- job_name: stackwalk
+  static_configs:
+    - targets: ['127.0.0.1:9188']

@@ -3,12 +3,26 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>stackwalk</title>
+  <title>stackwalk: Bitcoin Script step by step</title>
+  <!-- for search results and link previews: they read this HTML, not what app.js draws -->
+  <meta name="description" content="Step through Bitcoin Script with the stack at every opcode. Write a policy, miniscript or descriptor, pick a spend path, walk the run.">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="stackwalk">
+  <meta property="og:title" content="stackwalk: Bitcoin Script step by step">
+  <meta property="og:description" content="Policy, miniscript and descriptors compiled to Script, every spend path run op by op with the stack drawn.">
+  <meta property="og:url" content="https://vadim.rs/stackwalk/">
+  <meta property="og:image" content="https://vadim.rs/stackwalk/og.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="A 2-of-3 multisig run in stackwalk: the script, and the stack with keys and signatures">
+  <meta name="twitter:card" content="summary_large_image">
+  <link rel="canonical" href="https://vadim.rs/stackwalk/">
   <link rel="stylesheet" href="style.css">
   <!-- a saved theme before first paint (no flash); a file, not inline: the CSP allows only 'self' scripts -->
   <script src="theme.js"></script>
 </head>
 <body>
+  <noscript><p class="noscript">stackwalk steps through Bitcoin Script with the stack at every opcode: write a policy, miniscript or descriptor, pick a spend path, walk the run. It needs JavaScript. Source: <a href="https://github.com/vadim-anfv/stackwalk">github.com/vadim-anfv/stackwalk</a>.</p></noscript>
   <header>
     <div class="brand">stack<span>walk</span></div>
     <div class="hdr">

@@ -112,6 +112,8 @@ header {
 .site-foot { flex: none; padding: 2px 16px 6px; text-align: center; font-size: 12px; color: var(--muted); }
 .site-foot a { color: inherit; }
 .site-foot a:hover { color: var(--text); }
+.noscript { margin: 0; padding: 8px 16px; text-align: center; font-size: 14px; color: var(--text); border-bottom: 1px solid var(--line); }
+.noscript a { color: var(--accent); }
 
 /* keyboard shortcuts; padding sits on the children so a click on the dialog itself is the backdrop */
 .help-dlg {
