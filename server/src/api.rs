@@ -1,4 +1,4 @@
-//! The JSON API (see API.md), with the limits that keep one request, or a burst of
+//! The JSON API (types and their meaning in `model.rs`), with the limits that keep one request, or a burst of
 //! them, from taking the server: input and body size, time per compile, compiles at once.
 //! Rate limiting per client is the reverse proxy's job (nginx `limit_req`).
 use std::sync::Arc;
@@ -14,6 +14,7 @@ use serde_json::json;
 use tokio::sync::Semaphore;
 use tower_http::set_header::SetResponseHeaderLayer;
 
+use crate::metrics::Metrics;
 use crate::model::CompileReq;
 use crate::scenario;
 
@@ -41,6 +42,12 @@ impl Default for Limits {
 struct Api {
     limits: Limits,
     slots: Arc<Semaphore>,
+    metrics: Arc<Metrics>,
+}
+
+/// What the client sent as `kind`, as one of a fixed set: logs and metrics never carry client text.
+fn kind_label(kind: &str) -> &'static str {
+    ["policy", "miniscript", "descriptor", "script"].into_iter().find(|k| *k == kind).unwrap_or("other")
 }
 
 fn error(status: StatusCode, msg: String) -> Response {
@@ -52,12 +59,16 @@ async fn compile(State(api): State<Api>, req: Result<Json<CompileReq>, JsonRejec
         Ok(r) => r,
         Err(e) => {
             println!("compile rejected status={}", e.status().as_u16());
+            api.metrics.record("other", e.status().as_u16(), Duration::ZERO);
             return error(e.status(), format!("bad request: {}", e.body_text()));
         }
     };
     let start = Instant::now();
+    let metrics = api.metrics.clone();
     let (res, paths) = answer(api, req.clone()).await;
-    println!("{}", log_line(&req, res.status(), start.elapsed(), paths));
+    let took = start.elapsed();
+    println!("{}", log_line(&req, res.status(), took, paths));
+    metrics.record(kind_label(&req.kind), res.status().as_u16(), took);
     res
 }
 
@@ -92,11 +103,10 @@ async fn answer(api: Api, req: CompileReq) -> (Response, Option<usize>) {
 /// text itself or an error message (both can quote the input); kind and wrap come from the
 /// client, so only known values are written.
 fn log_line(req: &CompileReq, status: StatusCode, took: Duration, paths: Option<usize>) -> String {
-    let known = |v: Option<&str>, names: &[&'static str]| names.iter().find(|n| v == Some(**n)).copied().unwrap_or("other");
-    let kind = known(Some(&req.kind), &["policy", "miniscript", "descriptor", "script"]);
+    let kind = kind_label(&req.kind);
     let wrap = match req.wrap.as_deref() {
         None => "none",
-        w => known(w, &["bare", "pkh", "sh", "wpkh", "wsh", "tr"]),
+        Some(w) => ["bare", "pkh", "sh", "wpkh", "wsh", "tr"].into_iter().find(|k| *k == w).unwrap_or("other"),
     };
     let mut line = format!("compile kind={kind} wrap={wrap} len={} status={} ms={}", req.text.len(), status.as_u16(), took.as_millis());
     if let Some(n) = paths {
@@ -109,13 +119,19 @@ async fn ping() -> Json<serde_json::Value> {
     Json(json!({ "ok": true }))
 }
 
-pub fn router(limits: Limits) -> Router {
-    let api = Api { slots: Arc::new(Semaphore::new(limits.at_once)), limits: limits.clone() };
+pub fn router(limits: Limits, metrics: Arc<Metrics>) -> Router {
+    let api = Api { slots: Arc::new(Semaphore::new(limits.at_once)), limits: limits.clone(), metrics };
     Router::new()
         .route("/api/compile", post(compile))
         .route("/api/ping", get(ping))
         .layer(DefaultBodyLimit::max(limits.body))
         .with_state(api)
+}
+
+/// `/metrics` for Prometheus: for a private listener only, it is not on `router`.
+pub fn metrics_router(metrics: Arc<Metrics>) -> Router {
+    let text = |m: Arc<Metrics>| async move { ([(header::CONTENT_TYPE, "text/plain; version=0.0.4")], m.render()) };
+    Router::new().route("/metrics", get(move || text(metrics.clone())))
 }
 
 /// The page allows only its own scripts, styles, fonts and API (inline styles: the

@@ -3,6 +3,7 @@
 mod assets;
 mod api;
 mod keys;
+mod metrics;
 mod model;
 mod paths;
 mod real_keys;
@@ -48,7 +49,8 @@ fn dev_layers(app: Router, dir: &Path) -> (Router, notify::RecommendedWatcher) {
 
 #[tokio::main]
 async fn main() {
-    let app = api::router(api::Limits::default());
+    let metrics = std::sync::Arc::new(metrics::Metrics::default());
+    let app = api::router(api::Limits::default(), metrics.clone());
     // the page: web/ as is with live reload in debug builds, embedded in release
     #[cfg(debug_assertions)]
     let (app, _watcher, page) = {
@@ -66,6 +68,12 @@ async fn main() {
         let listener = tokio::net::TcpListener::bind(addr).await.unwrap_or_else(|e| panic!("bind {addr}: {e}"));
         println!("stackwalk on http://{addr}, page {page}");
         servers.spawn(axum::serve(listener, app.clone()).into_future());
+    }
+    // METRICS_BIND: Prometheus /metrics on its own address (e.g. 127.0.0.1:9187), never a public one
+    if let Ok(addr) = std::env::var("METRICS_BIND") {
+        let listener = tokio::net::TcpListener::bind(&addr).await.unwrap_or_else(|e| panic!("bind {addr}: {e}"));
+        println!("metrics on http://{addr}/metrics");
+        servers.spawn(axum::serve(listener, api::metrics_router(metrics)).into_future());
     }
     if let Some(res) = servers.join_next().await {
         res.expect("server task").expect("server");

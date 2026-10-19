@@ -1,3 +1,4 @@
+use std::sync::Arc;
 use std::time::Duration;
 
 use axum::body::{Body, to_bytes};
@@ -8,7 +9,7 @@ use super::*;
 
 async fn post(limits: Limits, content_type: &str, body: String) -> (StatusCode, String) {
     let req = Request::post("/api/compile").header(header::CONTENT_TYPE, content_type).body(Body::from(body)).unwrap();
-    let res = router(limits).oneshot(req).await.unwrap();
+    let res = router(limits, Arc::default()).oneshot(req).await.unwrap();
     let status = res.status();
     (status, String::from_utf8(to_bytes(res.into_body(), usize::MAX).await.unwrap().to_vec()).unwrap())
 }
@@ -85,7 +86,7 @@ fn a_log_line_has_no_user_text() {
 
 #[tokio::test]
 async fn security_headers_are_set() {
-    let app = secure(router(Limits::default()));
+    let app = secure(router(Limits::default(), Arc::default()));
     let res = app.oneshot(Request::get("/api/ping").body(Body::empty()).unwrap()).await.unwrap();
     let h = res.headers();
     assert_eq!(h["x-content-type-options"], "nosniff");
@@ -93,4 +94,32 @@ async fn security_headers_are_set() {
     assert_eq!(h["referrer-policy"], "strict-origin-when-cross-origin");
     let csp = h["content-security-policy"].to_str().unwrap();
     assert!(csp.contains("script-src 'self'") && csp.contains("frame-ancestors 'none'"), "{csp}");
+}
+
+async fn get_text(app: Router, path: &str) -> (StatusCode, String) {
+    let res = app.oneshot(Request::get(path).body(Body::empty()).unwrap()).await.unwrap();
+    let status = res.status();
+    (status, String::from_utf8(to_bytes(res.into_body(), usize::MAX).await.unwrap().to_vec()).unwrap())
+}
+
+#[tokio::test]
+async fn metrics_count_requests_by_kind_and_status() {
+    let metrics = Arc::new(Metrics::default());
+    for text in ["pk(A)", "pk(A)", "pk("] {
+        let body = serde_json::json!({ "kind": "policy", "text": text }).to_string();
+        let req = Request::post("/api/compile").header(header::CONTENT_TYPE, "application/json").body(Body::from(body)).unwrap();
+        router(Limits::default(), metrics.clone()).oneshot(req).await.unwrap();
+    }
+    let (status, text) = get_text(metrics_router(metrics), "/metrics").await;
+    assert_eq!(status, StatusCode::OK);
+    assert!(text.contains("stackwalk_requests_total{kind=\"policy\",status=\"200\"} 2\n"), "{text}");
+    assert!(text.contains("stackwalk_requests_total{kind=\"policy\",status=\"400\"} 1\n"), "{text}");
+    assert!(text.contains("stackwalk_compile_seconds_count 3\n"), "{text}");
+    assert!(text.contains("# TYPE stackwalk_requests_total counter"), "{text}");
+}
+
+#[tokio::test]
+async fn metrics_are_not_on_the_public_router() {
+    let (status, _) = get_text(router(Limits::default(), Arc::default()), "/metrics").await;
+    assert_eq!(status, StatusCode::NOT_FOUND);
 }
