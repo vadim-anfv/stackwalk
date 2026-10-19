@@ -1,4 +1,4 @@
-use super::compile;
+use super::{MAX_POLICY_CONDITIONS, compile};
 use crate::model::{CompileReq, Scenario};
 
 fn run(kind: &str, text: &str, wrap: Option<&str>) -> Result<Scenario, String> {
@@ -224,4 +224,36 @@ fn script_size_and_op_count() {
     // a failing run counts up to where it stops: the keys are added before the signatures are checked
     let wrong = sc.paths.iter().position(|p| p.fails).unwrap();
     assert_eq!(sc.traces[wrong].ops, 4);
+}
+
+/// `or(pk(A),or(pk(B),...))` over the first `n` of A..P
+fn or_chain(n: usize) -> String {
+    let keys: Vec<String> = ('A'..='P').take(n).map(|c| format!("pk({c})")).collect();
+    keys.iter().rev().skip(1).fold(keys[n - 1].clone(), |acc, k| format!("or({k},{acc})"))
+}
+
+#[test]
+fn a_policy_over_the_condition_limit_is_refused_before_compiling() {
+    // the policy compiler is exponential in the size of an or-chain: 12 keys take seconds
+    let err = run("policy", &or_chain(MAX_POLICY_CONDITIONS + 1), None).unwrap_err();
+    assert!(err.contains("too many conditions"), "{err}");
+    assert!(run("policy", &or_chain(MAX_POLICY_CONDITIONS), None).is_ok());
+}
+
+#[test]
+fn too_many_spend_paths_are_refused() {
+    // multi(3 of 9): 84 ways to pick the signers
+    let err = run("miniscript", "multi(3,A,B,C,D,E,F,G,H,I)", None).unwrap_err();
+    assert!(err.contains("too many spend paths"), "{err}");
+    // 2 of 10: 45
+    assert!(run("miniscript", "multi(2,A,B,C,D,E,F,G,H,I,J)", None).is_ok());
+}
+
+#[test]
+fn a_run_too_big_to_show_is_refused() {
+    // every push grows the stack, and every step carries the whole stack: quadratic
+    let script = vec!["OP_1"; 800].join(" ");
+    let err = run("script", &script, None).unwrap_err();
+    assert!(err.contains("too big to show"), "{err}");
+    assert!(run("script", &vec!["OP_1"; 100].join(" "), None).is_ok());
 }

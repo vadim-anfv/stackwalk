@@ -149,7 +149,10 @@ Templates: `pk` / `pkh` / `wpkh`: `A signs`, plus `B tries` (wrong signer). `mul
 
 Always `{ "error": "human readable message" }`, with the status:
 
-- 400: parse / compile errors, taproot, too many assets, a body that is not valid JSON, etc.
+- 400: parse / compile errors, taproot, a body that is not valid JSON, etc. Also the size limits that keep one answer small and quick:
+  - a policy with over 10 keys, hashes and timelocks (`too many conditions to compile here`): the policy compiler is exponential in the size of an or-chain. A miniscript of that size is fine;
+  - over 16 distinct assets, or over 64 spend paths (`too many spend paths to show`);
+  - over 30 000 stack items over all steps of all paths (`the run is too big to show`): every step carries its whole stack.
 - 413: the source `text` is over 4096 bytes, or the body over 16 KiB.
 - 415: the request is not `Content-Type: application/json`.
 - 503: the compile took over 5 s, or waited that long for a free slot (half the CPU cores compile at once).

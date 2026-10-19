@@ -57,8 +57,10 @@ async fn large_body_is_refused() {
 
 #[tokio::test]
 async fn a_slow_compile_times_out() {
-    let limits = Limits { time: Duration::ZERO, ..Limits::default() };
-    let (status, body) = compile_json(limits, "pk(A)").await;
+    // an or-chain of 10 keys: about a second for the policy compiler, in release
+    let chain = "or(pk(A),or(pk(B),or(pk(C),or(pk(D),or(pk(E),or(pk(F),or(pk(G),or(pk(H),or(pk(I),pk(J))))))))))";
+    let limits = Limits { time: Duration::from_millis(10), ..Limits::default() };
+    let (status, body) = compile_json(limits, chain).await;
     assert_eq!(status, StatusCode::SERVICE_UNAVAILABLE);
     assert!(body.contains("too long"), "{body}");
 }

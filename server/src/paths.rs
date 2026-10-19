@@ -13,6 +13,9 @@ use miniscript::{Miniscript, ScriptContext, Terminal, hash256};
 use crate::keys::KeyRing;
 
 pub const MAX_ATOMS: usize = 16;
+/// More paths than this do not fit the page (and each comes with a full trace):
+/// thresh(5 of 10) has 252.
+pub const MAX_PATHS: usize = 64;
 
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Atom {
@@ -103,6 +106,9 @@ pub fn enumerate<Ctx: ScriptContext>(ms: &Miniscript<PublicKey, Ctx>) -> Result<
             continue;
         }
         if let Witness::Stack(_) = ms.build_template(&Provider(&set)).stack {
+            if found.len() == MAX_PATHS {
+                return Err(format!("too many spend paths to show: more than {MAX_PATHS}"));
+            }
             found.push(set);
         }
     }

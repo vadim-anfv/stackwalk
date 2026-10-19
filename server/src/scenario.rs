@@ -17,10 +17,20 @@ use crate::spend::{Field, spend_data};
 use crate::trace::{Initial, Runner, ins_list, script_text};
 use crate::tree;
 
+/// Keys, hashes and timelocks in a policy. The compiler is exponential in the size of an
+/// or-chain: 10 conditions compile in about a second, 12 in several.
+pub const MAX_POLICY_CONDITIONS: usize = 10;
+
+/// Stack items over all steps of all paths: every step carries its whole stack, so a long
+/// run of pushes grows the answer quadratically (800 pushes: 320 000 items, 18 MB).
+pub const MAX_TRACE_ITEMS: usize = 30_000;
+
 pub fn compile(req: &CompileReq) -> Result<Scenario, String> {
     let mut text = req.text.trim();
     if req.kind == "script" {
-        return build(req, text);
+        let sc = build(req, text)?;
+        check_size(&sc)?;
+        return Ok(sc);
     }
     if req.kind == "descriptor" {
         // a pasted checksum is verified against the text as typed (real keys included)
@@ -36,6 +46,7 @@ pub fn compile(req: &CompileReq) -> Result<Scenario, String> {
     // real keys are built as test keys under free names, and shown as themselves again
     let (aliased, aliases) = real_keys::alias(text)?;
     let mut sc = build(req, &aliased)?;
+    check_size(&sc)?;
     // a descriptor that does not parse back (non-standard bare miniscript) is no wallet's either
     sc.importable = sc.descriptor.as_deref().and_then(|d| Descriptor::<String>::from_str(d).ok())
         .is_some_and(|d| d.for_each_key(|k| aliases.iter().any(|(name, _)| name == k)));
@@ -49,6 +60,14 @@ pub fn compile(req: &CompileReq) -> Result<Scenario, String> {
     }
     sc.keys = aliases.into_iter().map(|(name, key)| KeyAlias { name, key }).collect();
     Ok(sc)
+}
+
+fn check_size(sc: &Scenario) -> Result<(), String> {
+    let items: usize = sc.traces.iter().flat_map(|t| &t.steps).map(|s| s.stack.len() + s.alt.len()).sum();
+    if items > MAX_TRACE_ITEMS {
+        return Err(format!("the run is too big to show: {items} stack items over all its steps (max {MAX_TRACE_ITEMS})"));
+    }
+    Ok(())
 }
 
 fn build(req: &CompileReq, text: &str) -> Result<Scenario, String> {
@@ -150,10 +169,24 @@ fn target(wrap: Option<&str>) -> Result<Target, String> {
     }
 }
 
+/// Keys, hashes and timelocks of a policy, repeats included.
+fn conditions(pol: &Concrete<String>) -> usize {
+    use miniscript::iter::TreeLike;
+    pol.pre_order_iter()
+        .filter(|p| !matches!(p, Concrete::Unsatisfiable | Concrete::Trivial | Concrete::And(_) | Concrete::Or(_) | Concrete::Thresh(_)))
+        .count()
+}
+
 /// Compile the policy, or parse the miniscript, in the script context of `wrap`.
 fn build_in<Ctx: ScriptContext>(ring: &mut KeyRing, wrap: Wrap, kind: &str, text: &str) -> Result<Scenario, String> {
     let (ms, policy) = if kind == "policy" {
         let pol = Concrete::<String>::from_str(text).map_err(|e| format!("policy: {e}"))?;
+        let n = conditions(&pol);
+        if n > MAX_POLICY_CONDITIONS {
+            return Err(format!(
+                "too many conditions to compile here: {n} keys, hashes and timelocks (max {MAX_POLICY_CONDITIONS}); write it as miniscript instead"
+            ));
+        }
         let ms: Miniscript<String, Ctx> = pol.compile().map_err(|e| format!("compile: {e}"))?;
         // Display of Concrete shows weights (`1@pk(A)`), so echo the input text instead
         (ms, Some(text.split_whitespace().collect()))
