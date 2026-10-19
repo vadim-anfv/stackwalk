@@ -38,7 +38,6 @@ pub enum ExecError {
 
     // new ones for us
     ScriptIntNumericOverflow,
-    Debug,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

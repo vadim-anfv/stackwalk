@@ -67,12 +67,16 @@ pub fn script_text(ring: &KeyRing, script: &ScriptBuf) -> String {
     ins_list(ring, script, &mut ids).iter().map(ins_text).collect::<Vec<_>>().join(" ")
 }
 
+/// Policy rules are Core's standardness checks: a node does not relay a spend that breaks one,
+/// but a block may still contain it. Said so, or a learner reads them as consensus.
+const POLICY: &str = "a relay policy rule, not consensus";
+
 fn err_text(e: &ExecError, op: Option<Opcode>) -> String {
     use ExecError::*;
     match e {
         CheckSigVerify => "signature check failed".into(),
         CheckMultiSigVerify => "multisig check failed".into(),
-        NullFail => "signature check failed (NULLFAIL: a failing signature must be empty)".into(),
+        NullFail => format!("signature check failed: a failing signature must be empty (NULLFAIL, {POLICY})"),
         NullDummy => "the CHECKMULTISIG dummy element must be empty (NULLDUMMY)".into(),
         EqualVerify => "values are not equal".into(),
         NumEqualVerify => "numbers are not equal".into(),
@@ -82,19 +86,37 @@ fn err_text(e: &ExecError, op: Option<Opcode>) -> String {
         NegativeLocktime => "negative locktime".into(),
         InvalidStackOperation => "not enough elements on the stack".into(),
         UnbalancedConditional => "unbalanced IF / ELSE / ENDIF".into(),
-        TapscriptMinimalIf => "IF argument must be empty or exactly 0x01 (MINIMALIF)".into(),
+        TapscriptMinimalIf => format!("IF argument must be empty or exactly 0x01 (MINIMALIF, {POLICY} in segwit v0)"),
         OpReturn => "OP_RETURN always fails".into(),
         DisabledOpcode => "disabled opcode".into(),
         BadOpcode => "bad opcode".into(),
-        MinimalData => "non-minimal number encoding".into(),
+        MinimalData => format!("a push or number not in its shortest form (MINIMALDATA, {POLICY})"),
         PubkeyCount => "bad public key count".into(),
         SigCount => "bad signature count".into(),
-        WitnessPubkeyType => "uncompressed public key in segwit".into(),
+        WitnessPubkeyType => format!("uncompressed public key in segwit ({POLICY})"),
         OpCount => "too many opcodes".into(),
         StackSize => "stack too large".into(),
         PushSize => "push too large".into(),
         ScriptIntNumericOverflow => "number out of range".into(),
-        other => format!("{other:?}"),
+        OpCodeseparator => "OP_CODESEPARATOR is not allowed here".into(),
+        PubkeyType => "not a valid public key".into(),
+        TapscriptValidationWeight | SchnorrSigSize | SchnorrSigHashtype | SchnorrSig | TapscriptCheckMultiSig => {
+            "a taproot rule failed (taproot is not supported yet)".into()
+        }
+    }
+}
+
+/// Why a script does not parse, in words.
+fn parse_error_text(e: &crate::scriptexec::Error) -> String {
+    use crate::scriptexec::Error;
+    use miniscript::bitcoin::script::Error as Script;
+    match e {
+        Error::InvalidScript(Script::EarlyEndOfScript) => "the script ends in the middle of a push".into(),
+        Error::InvalidScript(Script::NonMinimalPush) => format!("a push not in its shortest form (MINIMALDATA, {POLICY})"),
+        Error::InvalidScript(Script::NumericOverflow) => "a number in the script is out of range".into(),
+        Error::InvalidScript(_) => "the script does not parse".into(),
+        Error::Exec(e) => err_text(e, None),
+        Error::Other(msg) => (*msg).into(),
     }
 }
 
@@ -219,7 +241,7 @@ impl<'a> Runner<'a> {
         let tmpl = TxTemplate { tx: self.tx.clone(), prevouts: self.prevouts.clone(), input_idx: 0, taproot_annex_scriptleaf: None };
         let mut exec = match Exec::new(ctx, Options::default(), tmpl, script.clone(), stack) {
             Ok(e) => e,
-            Err(e) => return Phase::Failed(format!("invalid script: {e:?}")),
+            Err(e) => return Phase::Failed(format!("invalid script: {}", parse_error_text(&e))),
         };
         loop {
             let pos = exec.script_position();

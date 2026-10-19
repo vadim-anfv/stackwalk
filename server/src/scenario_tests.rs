@@ -276,6 +276,18 @@ fn pick_and_roll_past_the_stack_fail_the_script_not_the_server() {
 }
 
 #[test]
+fn failures_are_worded_and_policy_rules_say_so() {
+    let msg = |script: &str| ok("script", script, None).traces[0].result.message.clone();
+    // MINIMALIF and NULLFAIL are relay policy, not consensus: a learner must be told
+    let m = msg("OP_2 OP_IF OP_1 OP_ENDIF");
+    assert!(m.contains("MINIMALIF") && m.contains("policy"), "{m}");
+    let sc = ok("policy", "pk(A)", None);
+    let wrong = sc.paths.iter().position(|p| p.fails).unwrap();
+    let m = &sc.traces[wrong].result.message;
+    assert!(m.contains("NULLFAIL") && m.contains("policy"), "{m}");
+}
+
+#[test]
 fn op_reserved_fails_only_when_executed() {
     // as Core: a reserved opcode in a branch not taken is fine
     let sc = ok("script", "OP_0 OP_IF OP_RESERVED OP_ENDIF OP_1", None);
