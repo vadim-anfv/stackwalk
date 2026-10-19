@@ -7,6 +7,16 @@ use std::str::FromStr;
 
 use miniscript::DescriptorPublicKey;
 
+/// A private key anywhere in the text: WIF or an extended private key (xprv / tprv). Decoded,
+/// not guessed: the checksum must hold, so a key name never trips it.
+pub fn has_private_key(text: &str) -> bool {
+    use miniscript::bitcoin::PrivateKey;
+    use miniscript::bitcoin::bip32::Xpriv;
+    text.split(|c: char| !c.is_ascii_alphanumeric())
+        .filter(|t| t.len() >= 51)
+        .any(|t| PrivateKey::from_wif(t).is_ok() || Xpriv::from_str(t).is_ok())
+}
+
 /// Fragments whose arguments are keys (multi's first argument is a number and never parses as one).
 const KEY_FNS: &[&str] = &["pk", "pkh", "pk_k", "pk_h", "multi", "sortedmulti", "multi_a", "sortedmulti_a", "wpkh", "tr"];
 

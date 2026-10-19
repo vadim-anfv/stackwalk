@@ -4,6 +4,7 @@ import { readLink, writeLink } from './link.js';
 import { describe, opText } from './opinfo.js';
 import { initTheme, loadPref, savePref } from './prefs.js';
 import { groups, scenarios } from './scenarios.js';
+import { privateKeyIn } from './secret.js';
 
 const state = {
   scenario: 0,
@@ -202,6 +203,12 @@ async function compileField(el) {
   if (!text) {
     state.drafts[kind] = el.value;
     setStatus('', '', el);
+    return;
+  }
+  if (privateKeyIn(text)) { // stays in the field only: not sent, not in the URL
+    state.drafts[kind] = el.value;
+    el.classList.add('invalid');
+    setStatus('warn', '✗ this is a private key: it is never needed here, and should not be pasted into any website. Use the public key', el);
     return;
   }
   const id = ++reqSeq;

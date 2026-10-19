@@ -26,6 +26,10 @@ pub const MAX_POLICY_CONDITIONS: usize = 10;
 pub const MAX_TRACE_ITEMS: usize = 30_000;
 
 pub fn compile(req: &CompileReq) -> Result<Scenario, String> {
+    // never echoed back, and never built into anything shown or linked
+    if real_keys::has_private_key(&req.text) {
+        return Err("this is a private key (WIF or xprv): it is never needed here, and should not be pasted into any website. Use the public key".into());
+    }
     let mut text = req.text.trim();
     if req.kind == "script" {
         let sc = build(req, text)?;

@@ -262,6 +262,25 @@ fn a_script_that_is_not_miniscript_says_why_its_stack_is_empty() {
 }
 
 #[test]
+fn a_private_key_is_refused_and_not_repeated() {
+    // a WIF key looked like a key name and compiled: it then sat in the page, the URL and history
+    let wif = "L1aW4aubDFB7yfras2S1mN3bqg9nwySY8nkoLmJebSLD5BWv3ENZ";
+    let xprv = "xprv9s21ZrQH143K3QTDL4LXw2F7HEK3wJUD2nW2nRk4stbPy6cq3jPPqjiChkVvvNKmPGJxWUtg6LnF5kejMRNNU3TGtRBeJgk33yuGBxrMPHi";
+    for (kind, text) in [
+        ("descriptor", format!("wsh(pk({wif}))")),
+        ("policy", format!("pk({wif})")),
+        ("descriptor", format!("wsh(pk({xprv}/0/*))")),
+        ("script", format!("<{wif}> OP_CHECKSIG")),
+    ] {
+        let err = run(kind, &text, None).unwrap_err();
+        assert!(err.contains("private key"), "{kind} {text}: {err}");
+        assert!(!err.contains(&wif[..12]) && !err.contains(&xprv[..12]), "{err}");
+    }
+    // public keys and names still pass
+    assert!(run("policy", "pk(Alice)", None).is_ok());
+}
+
+#[test]
 fn a_run_too_big_to_show_is_refused() {
     // every push grows the stack, and every step carries the whole stack: quadratic
     let script = vec!["OP_1"; 800].join(" ");
