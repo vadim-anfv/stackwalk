@@ -28,4 +28,4 @@ cargo test
 
 ## License
 
-MIT or Apache-2.0, at your option. Exceptions (the vendored interpreter, the title font Bicubik) are in [LICENSE](LICENSE).
+MIT or Apache-2.0, at your option. Exceptions (the vendored interpreter, the title font Orbitron, OFL) are in [LICENSE](LICENSE).

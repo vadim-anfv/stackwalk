@@ -5,4 +5,4 @@ Except as otherwise noted, all files in this repository are licensed under the A
 Exceptions:
 
 - `server/src/scriptexec/` is vendored from https://github.com/BitVM/rust-bitcoin-scriptexec, CC0-1.0, with local changes (listed in its `mod.rs`).
-- `web/bicubik.woff` is the Bicubik font by Anton Kudin (Jovanny Lemonad), distributed as freeware under its own terms.
+- `web/orbitron.ttf` is the Orbitron font (https://github.com/theleagueof/orbitron), unmodified, under the SIL Open Font License 1.1: see [LICENSE-OFL](LICENSE-OFL).

@@ -99,9 +99,9 @@ header {
   border-bottom: 1px solid var(--line);
 }
 
-/* Bicubik by Anton Kudin (Jovanny Lemonad freeware) */
-@font-face { font-family: 'Bicubik'; src: url('bicubik.woff') format('woff'); font-display: swap; }
-.brand { font-family: 'Bicubik', sans-serif; font-size: 16px; letter-spacing: 1.5px; text-transform: uppercase; }
+/* Orbitron (OFL 1.1, LICENSE-OFL): the original variable font, unmodified */
+@font-face { font-family: 'Orbitron'; src: url('orbitron.ttf') format('truetype'); font-weight: 400 900; font-display: swap; }
+.brand { font-family: 'Orbitron', sans-serif; font-weight: 500; font-size: 16px; letter-spacing: 1.5px; text-transform: uppercase; }
 .brand span { color: color-mix(in srgb, var(--text) 30%, var(--muted)); }
 .theme { margin-left: auto; min-width: 5.5em; }
 .help { min-width: 2.2em; font-weight: 600; }
