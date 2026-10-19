@@ -2,7 +2,7 @@
 
 Step through Bitcoin Script with the stack drawn at every opcode. Write a policy, miniscript or descriptor (or raw Script), pick a spend path, walk the run.
 
-![stackwalk: a 2-of-3 policy compiled to miniscript and P2WSH, its spend paths, and the stack in the middle of the run](docs/screenshot.png)
+![stackwalk: a 2-of-3 policy compiled to miniscript and P2WSH, its spend paths, and the run step by step until OP_CHECKMULTISIG leaves 1](docs/run.gif)
 
 Live at [vadim.rs/stackwalk](https://vadim.rs/stackwalk) (soon).
 
