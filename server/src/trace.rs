@@ -119,10 +119,10 @@ fn parse_error_text(e: &crate::scriptexec::Error) -> String {
 }
 
 pub struct Runner<'a> {
-    pub ring: &'a KeyRing,
-    pub ins: &'a [Ins],
-    pub tx: Transaction,
-    pub prevouts: Vec<TxOut>,
+    ring: &'a KeyRing,
+    ins: &'a [Ins],
+    tx: Transaction,
+    prevouts: Vec<TxOut>,
     steps: Vec<Step>,
     prev_main: Vec<Item>,
     prev_alt: Vec<Item>,
@@ -263,7 +263,7 @@ impl<'a> Runner<'a> {
                 (Some(i), Some(r)) => {
                     let pc = offset + i;
                     let err = r.error.as_ref().map(|e| err_text(e, op)).unwrap_or_else(|| "failed".into());
-                    let opname = crate::trace::ins_text(&self.ins[pc]);
+                    let opname = ins_text(&self.ins[pc]);
                     let note = self.note(op, executed, &prev, &exec, r.error.as_ref());
                     let (m, a) = (exec.stack().items().to_vec(), exec.altstack().items().to_vec());
                     self.push_step(pc as i64, &m, &a, executed, note, Some(format!("{opname}: {err}")));
