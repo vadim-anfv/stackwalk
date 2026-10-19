@@ -309,8 +309,11 @@ function renderStatic() {
   $('copy-desc').hidden = $('desc-sum').hidden;
   $('desc-sum').classList.toggle('test', !sc.importable);
   $('checksum').textContent = sc.checksum ? `#${sc.checksum}` : '';
-  $('sum-note').textContent = sc.importable ? '' : 'test keys: not importable';
-  $('sum-note').title = sc.importable ? '' : 'A wallet cannot use it: the keys are made up. Put real keys (hex, xpub) in the source.';
+  const testNames = sc.import_note?.startsWith('test names');
+  $('sum-note').textContent = sc.importable ? '' : testNames ? 'test keys: not importable' : 'not importable';
+  $('sum-note').title = sc.importable
+    ? ''
+    : `A wallet cannot use it: ${sc.import_note}.${testNames ? ' Put real keys (hex, xpub) and hashes in the source.' : ''}`;
   const realKeys = sc.keys ?? [];
   $('keys-row').hidden = !realKeys.length;
   $('keys').innerHTML = realKeys.map((k) => `<div title="${esc(k.key)}">${esc(k.name)} = ${esc(shortKey(k.key))}</div>`).join('');

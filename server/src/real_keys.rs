@@ -90,6 +90,15 @@ pub fn short(k: &str) -> String {
     format!("{}…{}", chars[..10].iter().collect::<String>(), chars[chars.len() - 6..].iter().collect::<String>())
 }
 
+fn hash_name(i: usize) -> String {
+    format!("H{i}")
+}
+
+/// The name `alias` gives a real hash (a key's name is a letter or `K1`, `K2`, ...).
+pub fn is_hash_name(name: &str) -> bool {
+    name.strip_prefix('H').is_some_and(|n| n.parse::<usize>().is_ok())
+}
+
 /// Swap real keys and hashes for free test names.
 pub fn alias(text: &str) -> Result<(String, Aliases), String> {
     // every name already in the text (test keys, hash names) is taken
@@ -100,8 +109,11 @@ pub fn alias(text: &str) -> Result<(String, Aliases), String> {
     });
     let mut aliases: Aliases = Vec::new();
     let mut free = ('A'..='Z').map(String::from).chain((1..).map(|i| format!("K{i}"))).filter(|n| !used.contains(n));
-    let mut free_hash = (1..).map(|i| format!("H{i}")).filter(|n| !used.contains(n));
+    let mut free_hash = (1..).map(hash_name).filter(|n| !used.contains(n));
     let mut err = None;
+    // a key is one key wherever it is; a hash only within its hash function (no preimage
+    // matches both sha256(h) and hash256(h))
+    let mut seen: Vec<(&str, String, String)> = Vec::new();
     let out = map_args(text, |tok, parent| {
         let hash = real_hash(tok, parent);
         if !hash {
@@ -113,10 +125,12 @@ pub fn alias(text: &str) -> Result<(String, Aliases), String> {
                 }
             }
         }
-        if let Some((name, _)) = aliases.iter().find(|(_, k)| k == tok) {
+        let group = if hash { HASH_FNS.iter().find(|(f, _)| *f == parent).map_or("", |(f, _)| *f) } else { "" };
+        if let Some((_, _, name)) = seen.iter().find(|(g, k, _)| *g == group && k == tok) {
             return Some(name.clone());
         }
         let name = if hash { free_hash.next() } else { free.next() }.expect("endless names");
+        seen.push((group, tok.to_string(), name.clone()));
         aliases.push((name.clone(), tok.to_string()));
         Some(name)
     });
@@ -124,6 +138,21 @@ pub fn alias(text: &str) -> Result<(String, Aliases), String> {
         Some(e) => Err(e),
         None => Ok((out, aliases)),
     }
+}
+
+/// The test names (keys and hash names, not real ones) in a text, in order of first appearance.
+pub fn test_names(text: &str) -> Vec<String> {
+    let mut names: Vec<String> = Vec::new();
+    map_args(text, |tok, parent| {
+        let in_fn = KEY_FNS.contains(&parent) || HASH_FNS.iter().any(|(f, _)| *f == parent);
+        // multi's threshold is a number
+        let name = in_fn && !tok.is_empty() && !tok.chars().all(|c| c.is_ascii_digit());
+        if name && !real_hash(tok, parent) && real_key(tok, parent).is_none() && !names.iter().any(|n| n == tok) {
+            names.push(tok.to_string());
+        }
+        None
+    });
+    names
 }
 
 /// Put the real keys and hashes back into a text built from the aliased one.

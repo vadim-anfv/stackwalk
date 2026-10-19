@@ -218,6 +218,10 @@ pub struct Scenario {
     pub checksum: Option<String>,
     /// every key of the descriptor is a real one: a wallet can import it
     pub importable: bool,
+    /// why not, when there is a descriptor: `test names, not real keys or hashes: A, H`, or
+    /// the parser's reason (a non-standard bare miniscript)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub import_note: Option<String>,
     /// output type actually built: bare, sh, wsh, pkh or wpkh
     pub wrap: &'static str,
     /// miniscript in bare / sh other than pk() / multi(): BIP-379 specifies it for wsh and tr only

@@ -69,6 +69,37 @@ fn legacy_sighash_drops_codeseparators_from_the_script_code() {
 }
 
 #[test]
+fn an_executed_codeseparator_starts_the_script_code() {
+    use bitcoin::hashes::Hash;
+    let (sk, pk) = key();
+    // <0xaaaa> DROP CODESEPARATOR <pk> CHECKSIG: the signature covers only what follows the separator
+    let script = [h("02aaaa"), h("75ab21"), pk.clone(), h("ac")].concat();
+    let code = [h("21"), pk, h("ac")].concat();
+    let sig = |ctx: ExecCtx, tmpl: &TxTemplate, code: &[u8]| match ctx {
+        ExecCtx::Legacy => {
+            let d = SighashCache::new(&tmpl.tx).legacy_signature_hash(0, Script::from_bytes(code), 1).expect("input 0");
+            sign(&sk, d.to_byte_array(), 1)
+        }
+        _ => {
+            let d = SighashCache::new(&tmpl.tx)
+                .p2wsh_signature_hash(0, Script::from_bytes(code), tmpl.prevouts[0].value, EcdsaSighashType::All)
+                .expect("input 0");
+            sign(&sk, d.to_byte_array(), 1)
+        }
+    };
+    for ctx in [ExecCtx::Legacy, ExecCtx::SegwitV0] {
+        let prevout = TxOut { value: bitcoin::Amount::from_sat(1000), script_pubkey: ScriptBuf::new() };
+        let good = sig(ctx, &tx(prevout.clone()), &code);
+        let res = run(ctx, tx(prevout.clone()), script.clone(), vec![good]);
+        assert_eq!(res.error, None, "{ctx:?}");
+        assert!(res.success, "{ctx:?}: signed over the code after the separator");
+        // one byte earlier is another script code: the same key's signature fails
+        let bad = sig(ctx, &tx(prevout.clone()), &script[4..]);
+        assert!(!run(ctx, tx(prevout), script.clone(), vec![bad]).success, "{ctx:?}: signed over the separator too");
+    }
+}
+
+#[test]
 fn segwit_sighash_commits_to_the_raw_hashtype() {
     use bitcoin::hashes::{Hash, HashEngine, sha256d};
     let (sk, pk) = key();

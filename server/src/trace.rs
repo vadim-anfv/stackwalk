@@ -3,8 +3,7 @@ use miniscript::bitcoin::opcodes::all::*;
 use miniscript::bitcoin::opcodes::Opcode;
 use miniscript::bitcoin::relative;
 use miniscript::bitcoin::script::Instruction;
-use miniscript::bitcoin::transaction::Version;
-use miniscript::bitcoin::{ScriptBuf, Sequence, Transaction, TxOut};
+use miniscript::bitcoin::{ScriptBuf, Transaction, TxOut};
 
 use crate::keys::KeyRing;
 use crate::model::{Ins, Item, Step, Trace, TraceResult};
@@ -351,8 +350,10 @@ impl<'a> Runner<'a> {
             }
             OP_TOALTSTACK => format!("move {} to the alt stack", t(1)),
             OP_FROMALTSTACK => "move the top of the alt stack back".into(),
-            // the reasons in the order the engine checks them (scriptexec check_sequence /
-            // check_locktime), so the note names the one that decided
+            // the reasons in the order the engine checks them (scriptexec OP_CSV / OP_CLTV, then
+            // check_sequence / check_lock_time), so the note names the one that decided. Our
+            // spends are version 2 and never final, so those checks never decide here.
+            OP_CSV | OP_CLTV if num(1).is_some_and(|n| n < 0) => "negative locktime: fails".into(),
             OP_CSV => {
                 let n = num(1).unwrap_or(0);
                 let seq = self.tx.input[0].sequence;
@@ -360,7 +361,6 @@ impl<'a> Runner<'a> {
                 let want = relative::LockTime::from_consensus((n & 0x0040_ffff) as u32).ok();
                 match (seq.to_relative_lock_time(), want) {
                     _ if n & (1 << 31) != 0 => "disable flag set: CSV acts as a NOP".into(),
-                    _ if self.tx.version < Version::TWO => "tx version below 2: no relative timelocks".into(),
                     (None, _) => "input nSequence disables relative timelocks".into(),
                     (Some(have), Some(want)) if std::mem::discriminant(&have) != std::mem::discriminant(&want) => {
                         format!("input age is {}, the script asks for {}: a timelock of the other kind", rel_text(have, false), rel_text(want, true))
@@ -376,9 +376,7 @@ impl<'a> Runner<'a> {
                 let n = num(1).unwrap_or(0);
                 let lt = self.tx.lock_time.to_consensus_u32();
                 let kind = |v: i64| if v < 500_000_000 { "block height" } else { "time" };
-                if self.tx.input[0].sequence == Sequence::MAX {
-                    "input nSequence is final (0xffffffff): the tx locktime is not enforced, so CLTV fails".into()
-                } else if kind(n) != kind(i64::from(lt)) {
+                if kind(n) != kind(i64::from(lt)) {
                     format!("tx locktime {lt} is a {}, the script asks for a {} ({n}): a timelock of the other kind", kind(i64::from(lt)), kind(n))
                 } else {
                     let rel = if err.is_none() { ">=" } else { "<" };

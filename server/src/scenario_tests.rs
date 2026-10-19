@@ -291,6 +291,55 @@ fn importable_means_every_key_and_hash_is_real() {
 }
 
 #[test]
+fn not_importable_says_why() {
+    // the page said "the keys are made up" also when they were real
+    let note = |text: &str| ok("descriptor", text, None).import_note;
+    assert_eq!(note(&format!("wsh(and_v(v:pk({HEX}),sha256(H)))")).as_deref(), Some("test names, not real keys or hashes: H"));
+    assert_eq!(note("wsh(multi(1,A,B))").as_deref(), Some("test names, not real keys or hashes: A, B"));
+    assert_eq!(note(&format!("wsh(pk({HEX}))")), None);
+    // real keys, but no wallet takes a non-standard bare miniscript
+    let bare = ok("miniscript", &format!("and_v(v:pk({HEX}),pk({G}))"), Some("bare")).import_note.expect("not importable");
+    assert!(bare.contains("standardness") && !bare.ends_with(['.', ' ', '\n']), "{bare:?}");
+}
+
+#[test]
+fn the_same_real_hash_under_two_hash_functions_gets_two_names() {
+    // one preimage "satisfied" sha256(h) and hash256(h): no x has both
+    let h = "ab".repeat(32);
+    let sc = ok("descriptor", &format!("wsh(and_v(v:sha256({h}),hash256({h})))"), None);
+    assert_eq!(sc.keys.len(), 2, "{:?}", sc.keys.iter().map(|k| &k.name).collect::<Vec<_>>());
+    assert_eq!(sc.descriptor.as_deref(), Some(format!("wsh(and_v(v:sha256({h}),hash256({h})))").as_str()));
+}
+
+const XONLY: &str = "79be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798";
+/// the generator: a second real key
+const G: &str = "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798";
+
+#[test]
+fn an_x_only_key_is_refused_outside_taproot() {
+    // it ran as a test key: "valid spend" for an output that cannot exist
+    for (kind, text, wrap) in [
+        ("descriptor", format!("wsh(pk({XONLY}))"), None),
+        ("descriptor", format!("pkh({XONLY})"), None),
+        ("miniscript", format!("pk({XONLY})"), Some("wsh")),
+        ("policy", format!("pk({XONLY})"), Some("sh")),
+    ] {
+        let err = run(kind, &text, wrap).unwrap_err();
+        assert!(err.contains("x-only"), "{kind} {text} {wrap:?}: {err}");
+    }
+}
+
+#[test]
+fn a_negative_timelock_note_says_so() {
+    // the engine fails on the sign first; the note spoke of the disable flag / a compare
+    for text in ["<-1> OP_CHECKSEQUENCEVERIFY", "<-1> OP_CHECKLOCKTIMEVERIFY"] {
+        let sc = ok("script", text, None);
+        let step = sc.traces[0].steps.iter().find(|s| s.error.is_some()).expect("it fails");
+        assert!(step.note.contains("negative"), "{text}: {}", step.note);
+    }
+}
+
+#[test]
 fn pick_and_roll_past_the_stack_fail_the_script_not_the_server() {
     // `1 1 PICK`: n is popped first, then one item is left, so index 1 is out of range (Core:
     // INVALID_STACK_OPERATION); checking before the pop let it through to an unwrap
@@ -345,7 +394,9 @@ fn a_miniscript_mixing_height_and_time_locks_is_refused() {
         ("descriptor", "wsh(and_v(v:older(1),older(4194305)))", None),
     ] {
         let err = run(kind, text, wrap).unwrap_err();
-        assert!(err.contains("timelock"), "{text}: {err}");
+        // the miniscript parser refuses the second one itself; the descriptors reach our check
+        let want = if kind == "descriptor" { "no transaction can meet both" } else { "heightlock and timelock" };
+        assert!(err.contains(want), "{text}: {err}");
     }
     // one kind of each is fine
     assert!(run("descriptor", "wsh(and_v(v:after(1),older(4194305)))", None).is_ok());

@@ -18,7 +18,9 @@ use crate::trace::{Initial, NO_WITNESS, Runner, ins_list, script_text};
 use crate::tree;
 
 /// Keys, hashes and timelocks in a policy. The compiler is exponential in the size of an
-/// or-chain: 10 conditions compile in about a second, 12 in several.
+/// or-chain: 10 keys compile in 1.1 s, 9 in 0.5 s (release; debug is about 6x slower, past
+/// `Limits::time`). The worst case stays well under the time limit, so a slot is never held
+/// after its request timed out; how many such requests one client sends is the proxy's job.
 pub const MAX_POLICY_CONDITIONS: usize = 10;
 
 /// Stack items over all steps of all paths: every step carries its whole stack, so a long
@@ -60,13 +62,27 @@ pub fn compile(req: &CompileReq) -> Result<Scenario, String> {
     }
     // a wallet can import it only if it parses with real keys and hashes: a test name (A, H)
     // does not, and neither does a non-standard bare miniscript
-    sc.importable = sc.descriptor.as_deref().is_some_and(|d| Descriptor::<DescriptorPublicKey>::from_str(d).is_ok());
-    // the run used (compressed) test keys: a real uncompressed key would have passed it, in an
-    // output no node relays a spend of
-    if matches!(sc.wrap, "wsh" | "wpkh")
-        && let Some((_, key)) = aliases.iter().find(|(_, k)| DescriptorPublicKey::from_str(k).is_ok_and(|k| k.is_uncompressed()))
-    {
-        return Err(format!("uncompressed keys are not allowed in segwit ({}): {}", sc.wrap, real_keys::short(key)));
+    if let Some(d) = &sc.descriptor {
+        let names = real_keys::test_names(d);
+        sc.import_note = match Descriptor::<DescriptorPublicKey>::from_str(d) {
+            Ok(_) => None,
+            Err(_) if !names.is_empty() => Some(format!("test names, not real keys or hashes: {}", names.join(", "))),
+            // the page adds its own full stop
+            Err(e) => Some(e.to_string().trim().trim_end_matches('.').to_string()),
+        };
+        sc.importable = sc.import_note.is_none();
+    }
+    // the run used (compressed) test keys: a real uncompressed or x-only key would have
+    // passed it, in an output no node relays a spend of, or that cannot exist
+    for (_, key) in aliases.iter().filter(|(name, _)| !real_keys::is_hash_name(name)) {
+        // a sha256 hash reads as an x-only key too
+        let Ok(k) = DescriptorPublicKey::from_str(key) else { continue };
+        if k.is_x_only_key() {
+            return Err(format!("x-only keys are for taproot, not {}: {}", sc.wrap, real_keys::short(key)));
+        }
+        if matches!(sc.wrap, "wsh" | "wpkh") && k.is_uncompressed() {
+            return Err(format!("uncompressed keys are not allowed in segwit ({}): {}", sc.wrap, real_keys::short(key)));
+        }
     }
     if let Some(d) = &sc.descriptor {
         let mut eng = checksum::Engine::new();
@@ -357,6 +373,7 @@ impl Scenario {
             descriptor: None,
             checksum: None,
             importable: false,
+            import_note: None,
             wrap,
             outside_bip379: false,
             keys: Vec::new(),
