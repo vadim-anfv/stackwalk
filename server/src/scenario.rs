@@ -7,7 +7,7 @@ use miniscript::policy::Concrete;
 use miniscript::{BareCtx, Descriptor, DescriptorPublicKey, ForEachKey, Legacy, Miniscript, MiniscriptKey, ScriptContext, Segwitv0, Terminal};
 
 use crate::keys::{KeyRing, NameTranslator};
-use crate::model::{CompileReq, Ins, KeyAlias, PathInfo, Scenario, Trace};
+use crate::model::{self, CompileReq, Ins, KeyAlias, Kind, PathInfo, Scenario, Trace};
 use crate::real_keys;
 use crate::paths::{self, PathSpec};
 use crate::sat::{Sat, SigCtx, dummy_tx};
@@ -31,12 +31,12 @@ pub fn compile(req: &CompileReq) -> Result<Scenario, String> {
         return Err("this is a private key (WIF or xprv): it is never needed here, and should not be pasted into any website. Use the public key".into());
     }
     let mut text = req.text.trim();
-    if req.kind == "script" {
+    if req.kind == Kind::Script {
         let sc = build(req, text)?;
         check_size(&sc)?;
         return Ok(sc);
     }
-    if req.kind == "descriptor" {
+    if req.kind == Kind::Descriptor {
         // a pasted checksum is verified against the text as typed (real keys included)
         text = checksum::verify_checksum(text).map_err(|e| match e {
             checksum::Error::InvalidChecksum { actual, expected } => format!(
@@ -83,13 +83,13 @@ fn check_size(sc: &Scenario) -> Result<(), String> {
 
 fn build(req: &CompileReq, text: &str) -> Result<Scenario, String> {
     let mut ring = KeyRing::new();
-    match req.kind.as_str() {
-        kind @ ("policy" | "miniscript") => match target(req.wrap.as_deref())? {
+    match req.kind {
+        kind @ (Kind::Policy | Kind::Miniscript) => match target(req.wrap)? {
             Target::Ms(Wrap::Wsh) => build_in::<Segwitv0>(&mut ring, Wrap::Wsh, kind, text),
             Target::Ms(Wrap::Sh) => build_in::<Legacy>(&mut ring, Wrap::Sh, kind, text),
             Target::Ms(Wrap::Bare) => build_in::<BareCtx>(&mut ring, Wrap::Bare, kind, text),
             Target::Pkh { segwit } => {
-                let key = if kind == "policy" {
+                let key = if kind == Kind::Policy {
                     match Concrete::<String>::from_str(text).map_err(|e| format!("policy: {e}"))? {
                         Concrete::Key(k) => Some(k),
                         _ => None,
@@ -100,21 +100,20 @@ fn build(req: &CompileReq, text: &str) -> Result<Scenario, String> {
                 };
                 let key = key.ok_or("pkh / wpkh take a single key, e.g. pk(A)")?;
                 let mut sc = build_pkh(&mut ring, &key, segwit);
-                if kind == "policy" {
+                if kind == Kind::Policy {
                     sc.policy = Some(text.to_string());
                 }
                 Ok(sc)
             }
         },
-        "descriptor" => descriptor(&mut ring, text),
-        "script" => {
+        Kind::Descriptor => descriptor(&mut ring, text),
+        Kind::Script => {
             let script = script_parse::parse(&mut ring, text)?;
             match script_parse::as_miniscript(&ring, &script) {
                 Some(ms) => build_ms(&mut ring, Wrap::Wsh, &ms, None),
                 None => Ok(build_raw(&mut ring, script)),
             }
         }
-        k => Err(format!("unknown kind {k:?}: expected policy, miniscript, descriptor or script")),
     }
 }
 
@@ -141,6 +140,7 @@ fn descriptor(ring: &mut KeyRing, text: &str) -> Result<Scenario, String> {
     }
 }
 
+/// The outputs a miniscript is built in (the request's is `model::Wrap`).
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum Wrap {
     Bare,
@@ -165,15 +165,15 @@ enum Target {
     Pkh { segwit: bool },
 }
 
-fn target(wrap: Option<&str>) -> Result<Target, String> {
-    match wrap.unwrap_or("wsh") {
-        "bare" => Ok(Target::Ms(Wrap::Bare)),
-        "sh" => Ok(Target::Ms(Wrap::Sh)),
-        "wsh" => Ok(Target::Ms(Wrap::Wsh)),
-        "pkh" => Ok(Target::Pkh { segwit: false }),
-        "wpkh" => Ok(Target::Pkh { segwit: true }),
-        "tr" => Err("taproot is not supported yet".into()),
-        w => Err(format!("unknown wrap {w:?}: expected bare, sh, wsh, pkh, wpkh or tr")),
+fn target(wrap: Option<model::Wrap>) -> Result<Target, String> {
+    use model::Wrap as W;
+    match wrap.unwrap_or(W::Wsh) {
+        W::Bare => Ok(Target::Ms(Wrap::Bare)),
+        W::Sh => Ok(Target::Ms(Wrap::Sh)),
+        W::Wsh => Ok(Target::Ms(Wrap::Wsh)),
+        W::Pkh => Ok(Target::Pkh { segwit: false }),
+        W::Wpkh => Ok(Target::Pkh { segwit: true }),
+        W::Tr => Err("taproot is not supported yet".into()),
     }
 }
 
@@ -186,8 +186,8 @@ fn conditions(pol: &Concrete<String>) -> usize {
 }
 
 /// Compile the policy, or parse the miniscript, in the script context of `wrap`.
-fn build_in<Ctx: ScriptContext>(ring: &mut KeyRing, wrap: Wrap, kind: &str, text: &str) -> Result<Scenario, String> {
-    let (ms, policy) = if kind == "policy" {
+fn build_in<Ctx: ScriptContext>(ring: &mut KeyRing, wrap: Wrap, kind: Kind, text: &str) -> Result<Scenario, String> {
+    let (ms, policy) = if kind == Kind::Policy {
         let pol = Concrete::<String>::from_str(text).map_err(|e| format!("policy: {e}"))?;
         let n = conditions(&pol);
         if n > MAX_POLICY_CONDITIONS {

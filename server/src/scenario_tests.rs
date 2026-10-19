@@ -1,8 +1,13 @@
 use super::{MAX_POLICY_CONDITIONS, compile};
 use crate::model::{CompileReq, Scenario};
 
+/// Kind and wrap as the page sends them.
+fn req(kind: &str, text: &str, wrap: Option<&str>) -> serde_json::Result<CompileReq> {
+    serde_json::from_value(serde_json::json!({ "kind": kind, "text": text, "wrap": wrap }))
+}
+
 fn run(kind: &str, text: &str, wrap: Option<&str>) -> Result<Scenario, String> {
-    compile(&CompileReq { kind: kind.into(), text: text.into(), wrap: wrap.map(Into::into) })
+    compile(&req(kind, text, wrap).unwrap())
 }
 
 fn ok(kind: &str, text: &str, wrap: Option<&str>) -> Scenario {
@@ -68,8 +73,11 @@ fn taproot_is_refused() {
 }
 
 #[test]
-fn unknown_wrap_is_refused() {
-    assert!(run("policy", "pk(A)", Some("p2foo")).is_err());
+fn unknown_kind_or_wrap_is_refused() {
+    assert!(req("policy", "pk(A)", Some("p2foo")).is_err());
+    assert!(req("Policy", "pk(A)", None).is_err());
+    // null, as absent, is the default (wsh)
+    assert!(req("policy", "pk(A)", None).is_ok_and(|r| r.wrap.is_none()));
 }
 
 #[test]

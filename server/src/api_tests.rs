@@ -6,6 +6,7 @@ use axum::http::{Request, StatusCode, header};
 use tower::ServiceExt;
 
 use super::*;
+use crate::model::Kind;
 
 async fn post(limits: Limits, content_type: &str, body: String) -> (StatusCode, String) {
     let req = Request::post("/api/compile").header(header::CONTENT_TYPE, content_type).body(Body::from(body)).unwrap();
@@ -76,12 +77,24 @@ async fn compiles_wait_for_a_free_slot() {
 
 #[test]
 fn a_log_line_has_no_user_text() {
-    let req = |kind: &str, text: &str, wrap: Option<&str>| CompileReq { kind: kind.into(), text: text.into(), wrap: wrap.map(Into::into) };
-    let line = log_line(&req("policy", "pk(SECRET)", Some("sh")), StatusCode::OK, Duration::from_millis(12), Some(3));
+    let req = CompileReq { kind: Kind::Policy, text: "pk(SECRET)".into(), wrap: Some(Wrap::Sh) };
+    let line = log_line(&req, StatusCode::OK, Duration::from_millis(12), Some(3));
     assert_eq!(line, "compile kind=policy wrap=sh len=10 status=200 ms=12 paths=3");
+    let line = log_line(&CompileReq { wrap: None, ..req }, StatusCode::BAD_REQUEST, Duration::ZERO, None);
+    assert_eq!(line, "compile kind=policy wrap=none len=10 status=400 ms=0");
+}
+
+#[tokio::test]
+async fn an_unknown_kind_or_wrap_is_rejected_as_other() {
     // what the client sends as kind / wrap is not trusted: no new lines, no forged fields
-    let line = log_line(&req("policy\ncompile kind=fake", "x", Some("a b")), StatusCode::BAD_REQUEST, Duration::ZERO, None);
-    assert_eq!(line, "compile kind=other wrap=other len=1 status=400 ms=0");
+    let metrics = Arc::new(Metrics::default());
+    for body in [r#"{"kind":"policy\ncompile kind=fake","text":"x"}"#, r#"{"kind":"policy","text":"x","wrap":"a b"}"#] {
+        let req = Request::post("/api/compile").header(header::CONTENT_TYPE, "application/json").body(Body::from(body)).unwrap();
+        let res = router(Limits::default(), metrics.clone()).oneshot(req).await.unwrap();
+        assert_eq!(res.status(), StatusCode::UNPROCESSABLE_ENTITY);
+    }
+    let (_, text) = get_text(metrics_router(metrics), "/metrics").await;
+    assert!(text.contains("stackwalk_requests_total{kind=\"other\",status=\"422\"} 2\n"), "{text}");
 }
 
 #[tokio::test]

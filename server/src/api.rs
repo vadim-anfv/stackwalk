@@ -5,6 +5,7 @@
 //! `POST /api/compile` answers 200 with a `Scenario`, or `{"error": "..."}` with:
 //! - 400: parse / compile errors, taproot, a body that is not JSON, and the size limits of
 //!   `scenario.rs` / `paths.rs` (policy conditions, spend paths, stack items in the answer);
+//! - 422: JSON that is not a request: a field missing, an unknown kind or wrap;
 //! - 413: source text or body over `Limits`; 415: not `Content-Type: application/json`;
 //! - 503: over `Limits::time`, waiting for a slot included; 500: the compile panicked.
 //!
@@ -24,7 +25,7 @@ use tokio::sync::Semaphore;
 use tower_http::set_header::SetResponseHeaderLayer;
 
 use crate::metrics::Metrics;
-use crate::model::CompileReq;
+use crate::model::{CompileReq, Wrap};
 use crate::scenario;
 
 #[derive(Clone)]
@@ -54,11 +55,6 @@ struct Api {
     metrics: Arc<Metrics>,
 }
 
-/// What the client sent as `kind`, as one of a fixed set: logs and metrics never carry client text.
-fn kind_label(kind: &str) -> &'static str {
-    ["policy", "miniscript", "descriptor", "script"].into_iter().find(|k| *k == kind).unwrap_or("other")
-}
-
 fn error(status: StatusCode, msg: String) -> Response {
     (status, Json(json!({ "error": msg }))).into_response()
 }
@@ -68,6 +64,7 @@ async fn compile(State(api): State<Api>, req: Result<Json<CompileReq>, JsonRejec
         Ok(r) => r,
         Err(e) => {
             println!("compile rejected status={}", e.status().as_u16());
+            // the kind may be what failed to parse
             api.metrics.record("other", e.status().as_u16(), Duration::ZERO);
             return error(e.status(), format!("bad request: {}", e.body_text()));
         }
@@ -77,7 +74,7 @@ async fn compile(State(api): State<Api>, req: Result<Json<CompileReq>, JsonRejec
     let (res, paths) = answer(api, req.clone()).await;
     let took = start.elapsed();
     println!("{}", log_line(&req, res.status(), took, paths));
-    metrics.record(kind_label(&req.kind), res.status().as_u16(), took);
+    metrics.record(req.kind.name(), res.status().as_u16(), took);
     res
 }
 
@@ -109,14 +106,9 @@ async fn answer(api: Api, req: CompileReq) -> (Response, Option<usize>) {
 }
 
 /// One line per compile, for the log: what kind of input, how big, how it went. Never the
-/// text itself or an error message (both can quote the input); kind and wrap come from the
-/// client, so only known values are written.
+/// text itself or an error message (both can quote the input).
 fn log_line(req: &CompileReq, status: StatusCode, took: Duration, paths: Option<usize>) -> String {
-    let kind = kind_label(&req.kind);
-    let wrap = match req.wrap.as_deref() {
-        None => "none",
-        Some(w) => ["bare", "pkh", "sh", "wpkh", "wsh", "tr"].into_iter().find(|k| *k == w).unwrap_or("other"),
-    };
+    let (kind, wrap) = (req.kind.name(), req.wrap.map_or("none", Wrap::name));
     let mut line = format!("compile kind={kind} wrap={wrap} len={} status={} ms={}", req.text.len(), status.as_u16(), took.as_millis());
     if let Some(n) = paths {
         line += &format!(" paths={n}");

@@ -4,24 +4,71 @@
 //! keys of free names (see [`Scenario::keys`]). No taproot.
 use serde::{Deserialize, Serialize};
 
+/// An unknown `kind` or `wrap` is a JSON error, as a missing field is.
 #[derive(Deserialize, Clone)]
 pub struct CompileReq {
-    /// `policy`, `miniscript`, `descriptor` or `script`:
-    /// - policy: compiled to miniscript for `wrap`, e.g. `or(pk(A),and(pk(B),older(144)))`;
-    /// - miniscript: parsed for `wrap`; no policy is lifted from it (fields flow one way);
-    /// - descriptor: `pk`, `pkh`, `wpkh`, `sh(ms)`, `wsh(ms)` or bare `ms`. A trailing
-    ///   `#checksum` is verified against the text as typed, never silently fixed;
-    /// - script: whitespace separated tokens: `OP_*` (`OP_0`..`OP_16`, `OP_TRUE`), decimal
-    ///   numbers, `<pk(A)>`, `<hash160(A)>`, `<sha256(H)>` (also hash256, ripemd160, hash160
-    ///   of a preimage), `<144>`, `<0x...>`. Parsed as segwit v0 miniscript if it is one (then
-    ///   as kind miniscript), else run once as a witness script with an empty witness.
-    pub kind: String,
+    pub kind: Kind,
     pub text: String,
-    /// output type for policy / miniscript: bare, sh, wsh (default), pkh, wpkh (these two
-    /// take a single key), tr (refused: no taproot yet). A descriptor names its own; a
+    /// output type for policy / miniscript, `wsh` if absent. A descriptor names its own; a
     /// script is always wsh.
     #[serde(default)]
-    pub wrap: Option<String>,
+    pub wrap: Option<Wrap>,
+}
+
+#[derive(Deserialize, Clone, Copy, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum Kind {
+    /// compiled to miniscript for `wrap`, e.g. `or(pk(A),and(pk(B),older(144)))`
+    Policy,
+    /// parsed for `wrap`; no policy is lifted from it (fields flow one way)
+    Miniscript,
+    /// `pk`, `pkh`, `wpkh`, `sh(ms)`, `wsh(ms)` or bare `ms`. A trailing `#checksum` is
+    /// verified against the text as typed, never silently fixed
+    Descriptor,
+    /// Whitespace separated tokens: `OP_*` (`OP_0`..`OP_16`, `OP_TRUE`), decimal numbers,
+    /// `<pk(A)>`, `<hash160(A)>`, `<sha256(H)>` (also hash256, ripemd160, hash160 of a
+    /// preimage), `<144>`, `<0x...>`. Parsed as segwit v0 miniscript if it is one (then as
+    /// kind miniscript), else run once as a witness script with an empty witness.
+    Script,
+}
+
+#[derive(Deserialize, Clone, Copy, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum Wrap {
+    Bare,
+    /// pkh and wpkh take a single key
+    Pkh,
+    Sh,
+    Wpkh,
+    Wsh,
+    /// refused: no taproot yet
+    Tr,
+}
+
+impl Kind {
+    /// as sent, for logs and metrics
+    pub fn name(self) -> &'static str {
+        match self {
+            Kind::Policy => "policy",
+            Kind::Miniscript => "miniscript",
+            Kind::Descriptor => "descriptor",
+            Kind::Script => "script",
+        }
+    }
+}
+
+impl Wrap {
+    /// as sent, for logs
+    pub fn name(self) -> &'static str {
+        match self {
+            Wrap::Bare => "bare",
+            Wrap::Pkh => "pkh",
+            Wrap::Sh => "sh",
+            Wrap::Wpkh => "wpkh",
+            Wrap::Wsh => "wsh",
+            Wrap::Tr => "tr",
+        }
+    }
 }
 
 /// A stack element or pushed data.
