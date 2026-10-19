@@ -103,11 +103,13 @@
       <div class="panel src">
         <div class="src-head">
           <h2>source <kbd title="Edit the source (E)">E</kbd></h2>
-          <label class="example"><span class="k">example</span><select id="scenario" aria-label="Example"></select></label>
           <button id="src-fold" class="fold" aria-label="Show or hide the source fields"></button>
         </div>
-        <!-- desktop: the example picker, a row like spend path below it -->
-        <div class="paths" data-desk="scenario"></div>
+        <!-- the example picker: a row like spend path, outside .src-body like it -->
+        <div class="paths">
+          <label for="scenario" class="k">example</label>
+          <select id="scenario"></select>
+        </div>
         <!-- which spend path runs: outside .src-body, so a folded source (phone) still shows it -->
         <div class="paths">
           <label for="paths" class="k">spend path</label>

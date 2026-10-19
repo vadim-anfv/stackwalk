@@ -153,7 +153,6 @@ select {
 /* in the source panel, lined up with the fields below */
 .paths { display: grid; grid-template-columns: 80px minmax(0, 1fr); gap: 8px; align-items: center; margin-bottom: 8px; }
 .paths > .k { white-space: nowrap; }
-.paths:empty { display: none; }
 .paths select { min-width: 0; text-overflow: ellipsis; }
 .chips { display: flex; flex-wrap: wrap; gap: 6px; }
 .chip.on, .seg button.on { border-color: var(--accent); color: var(--accent); }
@@ -280,8 +279,6 @@ textarea.src-input { display: block; resize: none; overflow: hidden; overflow-wr
 .src-msg.busy { color: var(--muted); }
 
 /* select is as wide as its longest option: let it shrink to the panel */
-.example { display: flex; align-items: center; gap: 8px; flex: 0 1 auto; min-width: 0; }
-.example select { min-width: 0; max-width: 100%; text-overflow: ellipsis; }
 
 .src .row { display: grid; grid-template-columns: 80px minmax(0, 1fr); gap: 8px; padding: 2px 0; }
 .src .row[hidden] { display: none; }
@@ -616,8 +613,6 @@ textarea.src-input { display: block; resize: none; overflow: hidden; overflow-wr
   .stackbox h2 { display: flex; align-items: center; gap: 6px; }
   .stackbox h2 .toggle-slot { margin-left: auto; }
   .keys-slot { padding: 0 0 8px 88px; }
-  /* the example picker moved into a spend-path-like row: its label and select become the grid cells */
-  .paths .example { display: contents; }
   /* panel titles: a bar across the panel, ruled off from the content */
   .panel > h2, .src-head, .script-head { margin: -2px -14px 10px; padding: 0 14px 8px; border-bottom: 1px solid var(--line); }
   .panel > h2, .src-head h2, .script-head h2 { color: color-mix(in srgb, var(--text) 70%, var(--muted)); }
