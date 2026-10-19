@@ -12,7 +12,8 @@
 //! STRICTENC added (Core's CheckSignatureEncoding / CheckPubKeyEncoding); the 10000-byte script
 //! size limit; DISCOURAGE_UPGRADABLE_NOPS. FindAndDelete as Core's (the push-encoded signature
 //! at opcode boundaries, an empty one too); the stack limit checked after data pushes too; the
-//! legacy sighash hashes the script code without OP_CODESEPARATORs.
+//! legacy sighash hashes the script code without OP_CODESEPARATORs; the segwit v0 sighash
+//! commits to the raw hashtype byte.
 
 use bitcoin::consensus::Encodable;
 use bitcoin::opcodes::{Opcode, all::*};

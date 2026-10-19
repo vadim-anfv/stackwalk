@@ -1,6 +1,7 @@
 //! Engine checks that Core's script_tests.json does not reach.
 use bitcoin::hex::FromHex;
 use bitcoin::secp256k1;
+use bitcoin::sighash::EcdsaSighashType;
 
 use super::*;
 
@@ -20,10 +21,14 @@ fn tx(prevout: TxOut) -> TxTemplate {
 }
 
 fn run(ctx: ExecCtx, tmpl: TxTemplate, script: Vec<u8>, stack: Vec<Vec<u8>>) -> ExecutionResult {
+    run_with(Options::default(), ctx, tmpl, script, stack)
+}
+
+fn run_with(opt: Options, ctx: ExecCtx, tmpl: TxTemplate, script: Vec<u8>, stack: Vec<Vec<u8>>) -> ExecutionResult {
     let ids = IdGen::new(0);
     let entries = stack.into_iter().map(|data| Entry { id: ids.next(), data }).collect();
     let script = ScriptBuf::from_bytes(script);
-    let mut exec = Exec::new(ctx, Options::default(), tmpl, script, Stack::from_entries(entries, ids)).expect("parses");
+    let mut exec = Exec::new(ctx, opt, tmpl, script, Stack::from_entries(entries, ids)).expect("parses");
     loop {
         if let Err(res) = exec.exec_next() {
             return res.clone();
@@ -60,6 +65,30 @@ fn legacy_sighash_drops_codeseparators_from_the_script_code() {
     let res = run(ExecCtx::Legacy, tmpl, script, vec![sign(&sk, digest, 1)]);
     assert_eq!(res.error, None);
     assert!(res.success, "the signature over the script code without separators is valid");
+}
+
+#[test]
+fn segwit_sighash_commits_to_the_raw_hashtype() {
+    use bitcoin::hashes::{Hash, HashEngine, sha256d};
+    let (sk, pk) = key();
+    let script = [h("21"), pk, h("ac")].concat();
+    let prevout = TxOut { value: bitcoin::Amount::from_sat(1000), script_pubkey: ScriptBuf::new() };
+    let tmpl = tx(prevout.clone());
+    // hashtype 0x21 signs like ALL, but BIP143 (as Core) puts 0x21 itself at the end of the preimage
+    let mut preimage = Vec::new();
+    SighashCache::new(&tmpl.tx)
+        .segwit_v0_encode_signing_data_to(&mut preimage, 0, Script::from_bytes(&script), prevout.value, EcdsaSighashType::All)
+        .expect("input 0");
+    let n = preimage.len();
+    preimage[n - 4..].copy_from_slice(&0x21u32.to_le_bytes());
+    let mut eng = sha256d::Hash::engine();
+    eng.input(&preimage);
+    let digest = sha256d::Hash::from_engine(eng).to_byte_array();
+    // an undefined hashtype is only refused by STRICTENC (policy)
+    let opt = Options { verify_strictenc: false, ..Options::default() };
+    let res = run_with(opt, ExecCtx::SegwitV0, tmpl, script, vec![sign(&sk, digest, 0x21)]);
+    assert_eq!(res.error, None);
+    assert!(res.success, "the signature over the raw hashtype is valid");
 }
 
 #[test]

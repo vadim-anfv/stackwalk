@@ -1,5 +1,6 @@
 use bitcoin::secp256k1::{self, PublicKey, XOnlyPublicKey};
-use bitcoin::sighash::{Annex, EcdsaSighashType, Prevouts, TapSighashType};
+use bitcoin::hashes::Hash;
+use bitcoin::sighash::{Annex, EcdsaSighashType, Prevouts, SegwitV0Sighash, TapSighashType};
 
 use std::sync::LazyLock;
 
@@ -92,16 +93,22 @@ impl Exec {
         sig.normalize_s();
 
         let sighash = if self.ctx == ExecCtx::SegwitV0 {
+            // BIP143 as Core: the preimage ends with the raw hashtype, rust-bitcoin writes its
+            // normalized form (0x21 as 0x01). The rest is the same: both pick ALL / NONE / SINGLE
+            // by `& 0x1f` and ANYONECANPAY by `& 0x80`.
+            let mut preimage = Vec::new();
             self.sighashcache
-                .p2wsh_signature_hash(
+                .segwit_v0_encode_signing_data_to(
+                    &mut preimage,
                     self.tx.input_idx,
                     Script::from_bytes(script_code),
                     self.tx.prevouts[self.tx.input_idx].value,
-                    //TODO(stevenroose) this might not actually emulate consensus behavior
                     EcdsaSighashType::from_consensus(hashtype as u32),
                 )
-                .expect("only happens on prevout index out of bounds")
-                .into()
+                .expect("input_idx is an input of the TxTemplate");
+            let n = preimage.len();
+            preimage[n - 4..].copy_from_slice(&u32::from(hashtype).to_le_bytes());
+            SegwitV0Sighash::hash(&preimage).into()
         } else if self.ctx == ExecCtx::Legacy {
             self.sighashcache
                 .legacy_signature_hash(
@@ -109,7 +116,7 @@ impl Exec {
                     Script::from_bytes(&without_codeseparators(script_code)),
                     hashtype as u32,
                 )
-                .expect("TODO(stevenroose) seems to only happen if prevout index out of bound")
+                .expect("input_idx is an input of the TxTemplate")
                 .into()
         } else {
             unreachable!();
