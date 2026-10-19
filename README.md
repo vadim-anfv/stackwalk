@@ -55,6 +55,10 @@ cargo test
 
 With **test keys** on, keys are names (`A`, `B`, ...) mapped to fixed test keys, and signatures are made over a dummy transaction. Descriptors with real public keys work too, but they are run with test keys of the same names: the Script shape and sizes are right, the key and signature bytes are not yours. Nothing here signs or broadcasts anything.
 
+## Contributing
+
+Bug reports and pull requests are welcome. Before a PR, run `cargo test` and `cargo clippy --all-targets` in `server/`; both should pass without warnings.
+
 ## Credits
 
 - [rust-miniscript](https://github.com/rust-bitcoin/rust-miniscript) and [rust-bitcoin](https://github.com/rust-bitcoin/rust-bitcoin)
