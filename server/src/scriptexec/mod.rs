@@ -10,9 +10,8 @@
 //! S normalized, as Core verifies them; WITNESS_PUBKEYTYPE an option, checked as Core does
 //! (compressed = 33 bytes with an 02 / 03 prefix, not just "not 65 bytes"); DERSIG, LOW_S and
 //! STRICTENC added (Core's CheckSignatureEncoding / CheckPubKeyEncoding); the 10000-byte script
-//! size limit; DISCOURAGE_UPGRADABLE_NOPS.
-
-use std::borrow::Cow;
+//! size limit; DISCOURAGE_UPGRADABLE_NOPS. FindAndDelete as Core's (the push-encoded signature
+//! at opcode boundaries, an empty one too).
 
 use bitcoin::consensus::Encodable;
 use bitcoin::opcodes::{Opcode, all::*};
@@ -36,6 +35,9 @@ pub use parse::parse_opcode;
 
 mod stack;
 pub use stack::{Entry, IdGen, Stack, scriptint_vec};
+
+#[cfg(test)]
+mod tests;
 
 /// Maximum number of non-push operations per script
 const MAX_OPS_PER_SCRIPT: usize = 201;
@@ -386,25 +388,9 @@ impl Exec {
     }
 
     /// Script code with the given signatures removed (legacy FindAndDelete).
-    /// Note: removes raw signature bytes, Core removes the push-encoded signature.
     pub(crate) fn script_code_without(&self, sigs: &[Vec<u8>]) -> Vec<u8> {
-        let mut scriptcode = Cow::Borrowed(self.script_code.as_bytes());
-        if self.ctx == ExecCtx::Legacy {
-            for sig in sigs {
-                if sig.is_empty() {
-                    continue;
-                }
-                let mut i = 0;
-                while i + sig.len() <= scriptcode.len() {
-                    if &scriptcode[i..i + sig.len()] == sig.as_slice() {
-                        scriptcode.to_mut().drain(i..i + sig.len());
-                    } else {
-                        i += 1;
-                    }
-                }
-            }
-        }
-        scriptcode.into_owned()
+        let code = self.script_code.as_bytes();
+        if self.ctx == ExecCtx::Legacy { remove_sigs(code, sigs) } else { code.to_vec() }
     }
 
     pub(crate) fn check_sig_with_code(
@@ -523,6 +509,70 @@ impl Exec {
 
         Ok(())
     }
+}
+
+/// Legacy script code minus each signature, as Core: FindAndDelete of `CScript() << sig`.
+fn remove_sigs(code: &[u8], sigs: &[Vec<u8>]) -> Vec<u8> {
+    let mut code = code.to_vec();
+    for sig in sigs {
+        code = find_and_delete(&code, &push_encoded(sig));
+    }
+    code
+}
+
+/// Core's `CScript << data`: the shortest push opcode for the length (empty is OP_0), then the data.
+fn push_encoded(data: &[u8]) -> Vec<u8> {
+    let mut out = Vec::with_capacity(data.len() + 5);
+    match data.len() {
+        n if n < OP_PUSHDATA1.to_u8() as usize => out.push(n as u8),
+        n if n <= 0xff => out.extend([OP_PUSHDATA1.to_u8(), n as u8]),
+        n if n <= 0xffff => {
+            out.push(OP_PUSHDATA2.to_u8());
+            out.extend((n as u16).to_le_bytes());
+        }
+        n => {
+            out.push(OP_PUSHDATA4.to_u8());
+            out.extend((n as u32).to_le_bytes());
+        }
+    }
+    out.extend_from_slice(data);
+    out
+}
+
+/// End of the opcode at `pc`, or None at the end of the script or on a truncated push (Core's GetOp).
+fn next_op(script: &[u8], pc: usize) -> Option<usize> {
+    let op = *script.get(pc)?;
+    let (len_bytes, len) = match op {
+        n if n < OP_PUSHDATA1.to_u8() => (0, usize::from(n)),
+        n if n == OP_PUSHDATA1.to_u8() => (1, usize::from(*script.get(pc + 1)?)),
+        n if n == OP_PUSHDATA2.to_u8() => (2, usize::from(u16::from_le_bytes(script.get(pc + 1..pc + 3)?.try_into().ok()?))),
+        n if n == OP_PUSHDATA4.to_u8() => (4, u32::from_le_bytes(script.get(pc + 1..pc + 5)?.try_into().ok()?) as usize),
+        _ => (0, 0),
+    };
+    let end = pc + 1 + len_bytes + len;
+    (end <= script.len()).then_some(end)
+}
+
+/// Core's FindAndDelete: drops `b` wherever it starts at an opcode boundary, in one pass.
+fn find_and_delete(script: &[u8], b: &[u8]) -> Vec<u8> {
+    if b.is_empty() {
+        return script.to_vec();
+    }
+    let mut out = Vec::with_capacity(script.len());
+    let (mut pc, mut kept) = (0, 0);
+    loop {
+        out.extend_from_slice(&script[kept..pc]);
+        while script[pc..].starts_with(b) {
+            pc += b.len();
+        }
+        kept = pc;
+        match next_op(script, pc) {
+            Some(next) => pc = next,
+            None => break,
+        }
+    }
+    out.extend_from_slice(&script[kept..]);
+    out
 }
 
 /// Decodes an interger in script format with flexible size limit.
