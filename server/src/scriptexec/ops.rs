@@ -256,7 +256,8 @@ impl Exec {
             OP_PICK | OP_ROLL => {
                 // (xn ... x2 x1 x0 n - xn ... x2 x1 x0 xn)
                 // (xn ... x2 x1 x0 n - ... x2 x1 x0 xn)
-                // as Core: n is popped first, then checked against what is left
+                // as Core: two elements first, then n is popped and checked against what is left
+                self.stack.needn(2)?;
                 let x = self.stack.topnum(-1, self.opt.require_minimal)?;
                 self.stack.pop().unwrap();
                 if x < 0 || x >= self.stack.len() as i64 {

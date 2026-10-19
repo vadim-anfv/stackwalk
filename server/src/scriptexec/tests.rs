@@ -125,6 +125,15 @@ fn csv_reads_the_tx_version_unsigned() {
 }
 
 #[test]
+fn pick_and_roll_need_two_elements_before_reading_n() {
+    // Core checks the depth first: a lone 5-byte n is a stack error, not a number error
+    for op in ["79", "7a"] {
+        let res = run(ExecCtx::Legacy, tx(TxOut::NULL), h(op), vec![h("0100000000")]);
+        assert_eq!(res.error, Some(ExecError::InvalidStackOperation), "opcode {op}");
+    }
+}
+
+#[test]
 fn data_pushes_count_toward_the_stack_limit() {
     // 1001 pushes of 0xff: Core fails at the 1001st (STACK_SIZE is checked after every opcode)
     let script = h(&"01ff".repeat(1001));
