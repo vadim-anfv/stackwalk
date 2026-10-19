@@ -253,7 +253,9 @@ async function compileField(el) {
   if (res.sc.wrap) state.wrap = res.sc.wrap; // a typed descriptor picks the output
   state.path = 0;
   load();
-  setStatus('ok', '✓ compiled', el);
+  // only a policy is compiled (a choice among miniscripts); the rest is checked and encoded
+  const DONE = { policy: 'compiled to miniscript', miniscript: 'valid miniscript', descriptor: 'valid descriptor', script: 'parsed' };
+  setStatus('ok', `✓ ${DONE[kind]}`, el);
 }
 
 // pick an example: the backend compiles and runs it
