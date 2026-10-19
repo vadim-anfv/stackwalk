@@ -1,9 +1,7 @@
 import { renderCost } from './cost.js';
+import { $, esc } from './dom.js';
 import { describe, opText } from './opinfo.js';
 import { groups, scenarios } from './scenarios.js';
-
-const $ = (id) => document.getElementById(id);
-const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
 
 function loadPref(key, fallback) {
   try {
@@ -168,7 +166,7 @@ function sourceText(sc, kind) {
 // {offline: true} when the backend is not reachable (the page is cached, or served by something else)
 async function compile(body) {
   try {
-    const r = await fetch('/api/compile', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    const r = await fetch('api/compile', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
     if (r.status === 502 || r.status === 404 || r.status === 405) return { offline: true };
     const data = await r.json();
     return r.ok ? { sc: data } : { error: data.error ?? `HTTP ${r.status}` };

@@ -5,13 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>stackwalk</title>
   <link rel="stylesheet" href="style.css">
-  <!-- apply a saved theme before first paint (no flash); logic lives in app.js -->
-  <script>
-    try {
-      const t = localStorage.getItem('stackwalk.theme');
-      if (t === 'light' || t === 'dark') document.documentElement.dataset.theme = t;
-    } catch {}
-  </script>
+  <!-- a saved theme before first paint (no flash); a file, not inline: the CSP allows only 'self' scripts -->
+  <script src="theme.js"></script>
 </head>
 <body>
   <header>

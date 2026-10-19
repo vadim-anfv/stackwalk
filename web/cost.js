@@ -1,8 +1,8 @@
 // Desktop side panels under the source: every spend path with its cost (a row runs it), the
 // input as sent (witness / scriptSig) for the current one and the script limits it runs into.
 
-const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
-const $ = (id) => document.getElementById(id);
+import { $, esc } from './dom.js';
+
 const bytes = (it) => it.hex.length / 2;
 
 // stack + alt stack at their highest point of the run (consensus limit 1000)
