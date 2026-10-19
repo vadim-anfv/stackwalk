@@ -123,10 +123,10 @@ impl KeyRing {
         if b.is_empty() {
             return Item { id, kind: "num", label: "<empty>".into(), hex, value: Some(0), name: None };
         }
-        if b.len() <= 4 {
-            if let Ok(v) = read_scriptint(b, 4, true) {
-                return Item { id, kind: "num", label: v.to_string(), hex, value: Some(v), name: None };
-            }
+        if b.len() <= 4
+            && let Ok(v) = read_scriptint(b, 4, true)
+        {
+            return Item { id, kind: "num", label: v.to_string(), hex, value: Some(v), name: None };
         }
         Item { id, kind: "hash", label: short_hex(&hex), hex, value: None, name: None }
     }

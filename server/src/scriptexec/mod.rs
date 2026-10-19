@@ -226,10 +226,10 @@ impl Exec {
                 return Err(Error::Other("missing taproot tx info in tapscript context"));
             }
 
-            if let Some((_, Some(ref annex))) = tx.taproot_annex_scriptleaf {
-                if annex.first() != Some(&taproot::TAPROOT_ANNEX_PREFIX) {
-                    return Err(Error::Other("invalid annex: missing prefix"));
-                }
+            if let Some((_, Some(ref annex))) = tx.taproot_annex_scriptleaf
+                && annex.first() != Some(&taproot::TAPROOT_ANNEX_PREFIX)
+            {
+                return Err(Error::Other("invalid annex: missing prefix"));
             }
         }
 
@@ -544,10 +544,10 @@ impl Exec {
                     _ => {}
                 }
 
-                if exec || (op.to_u8() >= OP_IF.to_u8() && op.to_u8() <= OP_ENDIF.to_u8()) {
-                    if let Err(err) = self.exec_opcode(op) {
-                        return self.failop(err, op);
-                    }
+                if (exec || (op.to_u8() >= OP_IF.to_u8() && op.to_u8() <= OP_ENDIF.to_u8()))
+                    && let Err(err) = self.exec_opcode(op)
+                {
+                    return self.failop(err, op);
                 }
             }
         }
