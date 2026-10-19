@@ -29,6 +29,9 @@ pub enum ExecError {
     PubkeyCount,
     StackSize,
     WitnessPubkeyType,
+    SigDer,
+    SigHighS,
+    SigHashtype,
 
     SigCount,
     NullFail,

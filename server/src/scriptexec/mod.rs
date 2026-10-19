@@ -8,7 +8,8 @@
 //! is gone). Execution stats and other unused API removed. Checked against Core's
 //! script_tests.json (src/core_vectors.rs), which led to: ECDSA signatures parsed lax DER with
 //! S normalized, as Core verifies them; WITNESS_PUBKEYTYPE an option, checked as Core does
-//! (compressed = 33 bytes with an 02 / 03 prefix, not just "not 65 bytes").
+//! (compressed = 33 bytes with an 02 / 03 prefix, not just "not 65 bytes"); DERSIG, LOW_S and
+//! STRICTENC added (Core's CheckSignatureEncoding / CheckPubKeyEncoding).
 
 use std::borrow::Cow;
 
@@ -79,6 +80,12 @@ pub struct Options {
     pub verify_nulldummy: bool,
     /// Segwit v0 public keys must be compressed (WITNESS_PUBKEYTYPE, policy).
     pub verify_witness_pubkeytype: bool,
+    /// Signatures must be strict DER (BIP66 DERSIG).
+    pub verify_dersig: bool,
+    /// Signatures must have a low S (LOW_S, policy).
+    pub verify_low_s: bool,
+    /// Defined hashtypes, well-formed public keys, strict DER (STRICTENC, policy).
+    pub verify_strictenc: bool,
 }
 
 impl Default for Options {
@@ -92,6 +99,9 @@ impl Default for Options {
             verify_nullfail: true,
             verify_nulldummy: true,
             verify_witness_pubkeytype: true,
+            verify_dersig: true,
+            verify_low_s: true,
+            verify_strictenc: true,
         }
     }
 }
@@ -388,11 +398,8 @@ impl Exec {
         pk: &[u8],
         scriptcode: &[u8],
     ) -> Result<bool, ExecError> {
-        // Core's IsCompressedPubKey: 33 bytes with an 02 / 03 prefix
-        let compressed = pk.len() == 33 && matches!(pk[0], 0x02 | 0x03);
-        if self.opt.verify_witness_pubkeytype && self.ctx == ExecCtx::SegwitV0 && !compressed {
-            return Err(ExecError::WitnessPubkeyType);
-        }
+        self.check_signature_encoding(sig)?;
+        self.check_pubkey_encoding(pk)?;
         let ok = self.check_sig_ecdsa(sig, pk, scriptcode);
         self.last_checks.push(SigCheck { sig: sig.to_vec(), pk: pk.to_vec(), ok });
         Ok(ok)

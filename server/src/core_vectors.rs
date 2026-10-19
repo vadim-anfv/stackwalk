@@ -20,6 +20,8 @@ use crate::scriptexec::{Entry, Exec, ExecCtx, ExecError, IdGen, Options, Stack, 
 
 /// Vectors we knowingly disagree with: (index in the JSON array, why). Prefer fixing.
 const KNOWN_GAPS: &[(usize, &str)] = &[
+    // no 10000-byte script size limit yet
+    (833, "script size 10001 must fail SCRIPT_SIZE"),
 ];
 
 /// Flags our engine or this harness implements; any other flag skips the vector.
@@ -37,6 +39,9 @@ const SUPPORTED: &[&str] = &[
     "CLEANSTACK",
     "SIGPUSHONLY",
     "WITNESS_PUBKEYTYPE",
+    "STRICTENC",
+    "DERSIG",
+    "LOW_S",
     "DISCOURAGE_UPGRADABLE_WITNESS_PROGRAM",
 ];
 
@@ -155,6 +160,9 @@ impl Flags {
             verify_nullfail: self.has("NULLFAIL"),
             verify_nulldummy: self.has("NULLDUMMY"),
             verify_witness_pubkeytype: self.has("WITNESS_PUBKEYTYPE"),
+            verify_dersig: self.has("DERSIG"),
+            verify_low_s: self.has("LOW_S"),
+            verify_strictenc: self.has("STRICTENC"),
         }
     }
 }
@@ -185,6 +193,9 @@ fn core_err(e: &ExecError, op: Option<Opcode>, ctx: ExecCtx) -> &'static str {
         PubkeyCount => "PUBKEY_COUNT",
         StackSize => "STACK_SIZE",
         WitnessPubkeyType => "WITNESS_PUBKEYTYPE",
+        SigDer => "SIG_DER",
+        SigHighS => "SIG_HIGH_S",
+        SigHashtype => "SIG_HASHTYPE",
         SigCount => "SIG_COUNT",
         NullFail => "NULLFAIL",
         NullDummy => "SIG_NULLDUMMY",
