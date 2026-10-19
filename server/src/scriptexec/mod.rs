@@ -15,10 +15,11 @@
 //! legacy sighash hashes the script code without OP_CODESEPARATORs; the segwit v0 sighash
 //! commits to the raw hashtype byte; CSV reads the tx version unsigned; PICK / ROLL need two
 //! elements before reading n. parse.rs: OP_PUSHDATA1 is a known name (was "_PUSHDATA1").
+//! No unsafe: the script is owned and read by position, not leaked for a static iterator.
 
 use bitcoin::consensus::Encodable;
 use bitcoin::opcodes::{Opcode, all::*};
-use bitcoin::script::{self, Instruction, Instructions, Script, ScriptBuf};
+use bitcoin::script::{self, Instruction, Script, ScriptBuf};
 use bitcoin::sighash::SighashCache;
 use bitcoin::taproot::{self, TapLeafHash};
 use bitcoin::transaction::{Transaction, TxOut};
@@ -182,32 +183,22 @@ pub struct Exec {
     result: Option<ExecutionResult>,
 
     sighashcache: SighashCache<Transaction>,
-    script: &'static Script,
-    instructions: Instructions<'static>,
+    script: ScriptBuf,
+    /// where the next instruction starts; the one being run starts at `current_position`
+    next_position: usize,
     current_position: usize,
     cond_stack: ConditionStack,
     stack: Stack,
     altstack: Stack,
     last_codeseparator_pos: Option<u32>,
-    // Initially set to the whole script, but updated when
-    // OP_CODESEPARATOR is encountered.
-    script_code: &'static Script,
+    // Where the script code starts: 0, then just after the last OP_CODESEPARATOR run.
+    script_code_start: usize,
 
     opcode_count: usize,
     validation_weight: i64,
 
     /// Signature checks done by the last executed opcode.
     pub last_checks: Vec<SigCheck>,
-}
-
-impl std::ops::Drop for Exec {
-    fn drop(&mut self) {
-        // we need to safely drop the script we allocated
-        unsafe {
-            let script = core::mem::replace(&mut self.script, Script::from_bytes(&[]));
-            let _ = Box::from_raw(script as *const Script as *mut Script);
-        }
-    }
 }
 
 impl Exec {
@@ -242,16 +233,6 @@ impl Exec {
             return Err(Error::InvalidScript(err));
         }
 
-        // *****
-        // Make sure there is no more possible exit path after this point!
-        // Otherwise we are leaking memory.
-        // *****
-
-        // We box alocate the script to get a static Instructions iterator.
-        // We will manually drop this allocation in the ops::Drop impl.
-        let script = Box::leak(script.into_boxed_script()) as &'static Script;
-        let instructions = script.instructions();
-
         //TODO(stevenroose) make this more efficient
         let witness_size =
             Encodable::consensus_encode(&script_witness, &mut bitcoin::io::sink()).unwrap();
@@ -263,7 +244,7 @@ impl Exec {
 
             sighashcache: SighashCache::new(tx.tx.clone()),
             script,
-            instructions,
+            next_position: 0,
             current_position: 0,
             cond_stack: ConditionStack::new(),
             altstack: Stack::new(stack.ids()),
@@ -272,7 +253,7 @@ impl Exec {
             opcode_count: 0,
             validation_weight,
             last_codeseparator_pos: None,
-            script_code: script,
+            script_code_start: 0,
 
             opt,
             tx,
@@ -289,7 +270,7 @@ impl Exec {
     //////////////////
 
     pub fn script_position(&self) -> usize {
-        self.script.len() - self.instructions.as_script().len()
+        self.next_position
     }
 
     pub fn stack(&self) -> &Stack {
@@ -392,7 +373,7 @@ impl Exec {
 
     /// Script code with the given signatures removed (legacy FindAndDelete).
     pub(crate) fn script_code_without(&self, sigs: &[Vec<u8>]) -> Vec<u8> {
-        let code = self.script_code.as_bytes();
+        let code = &self.script.as_bytes()[self.script_code_start..];
         if self.ctx == ExecCtx::Legacy { remove_sigs(code, sigs) } else { code.to_vec() }
     }
 
@@ -454,9 +435,18 @@ impl Exec {
         }
 
         self.last_checks.clear();
-        self.current_position = self.script.len() - self.instructions.as_script().len();
-        let instruction = match self.instructions.next() {
-            Some(Ok(i)) => i,
+        // read the next instruction from the owned script by position (no self-borrow kept)
+        self.current_position = self.next_position;
+        let mut rest = Script::from_bytes(&self.script.as_bytes()[self.next_position..]).instructions();
+        let next = match rest.next() {
+            Some(Ok(Instruction::PushBytes(p))) => Some(Next::Push(p.as_bytes().to_vec())),
+            Some(Ok(Instruction::Op(op))) => Some(Next::Op(op)),
+            Some(Err(_)) => unreachable!("we checked the script beforehand"),
+            None => None,
+        };
+        self.next_position = self.script.len() - rest.as_script().len();
+        let instruction = match next {
+            Some(i) => i,
             None => {
                 if !self.cond_stack.is_empty() {
                     return self.fail(ExecError::UnbalancedConditional);
@@ -465,27 +455,26 @@ impl Exec {
                 self.result = Some(res);
                 return Err(self.result.as_ref().unwrap());
             }
-            Some(Err(_)) => unreachable!("we checked the script beforehand"),
         };
 
         let exec = self.cond_stack.all_true();
         match instruction {
-            Instruction::PushBytes(p) => {
+            Next::Push(p) => {
                 if p.len() > MAX_SCRIPT_ELEMENT_SIZE {
                     return self.fail(ExecError::PushSize);
                 }
                 if exec {
-                    if self.opt.require_minimal && !minimal_push(self.script.as_bytes()[self.current_position], p.as_bytes()) {
+                    if self.opt.require_minimal && !minimal_push(self.script.as_bytes()[self.current_position], &p) {
                         return self.fail(ExecError::MinimalData);
                     }
-                    self.stack.pushstr(p.as_bytes());
+                    self.stack.pushstr(&p);
                     // as Core: the limit holds after every executed opcode, pushes included
                     if self.opt.enforce_stack_limit && self.stack.len() + self.altstack.len() > MAX_STACK_SIZE {
                         return self.fail(ExecError::StackSize);
                     }
                 }
             }
-            Instruction::Op(op) => {
+            Next::Op(op) => {
                 // Some things we do even when we're not executing.
 
                 // Note how OP_RESERVED does not count towards the opcode limit.
@@ -637,6 +626,12 @@ pub fn read_scriptint_size(v: &[u8], max_size: usize, minimal: bool) -> Result<i
     }
 
     Ok(scriptint_parse(v))
+}
+
+/// The instruction about to run, owned: the script it was read from stays borrowable.
+enum Next {
+    Push(Vec<u8>),
+    Op(Opcode),
 }
 
 /// Core's CheckMinimalPush: `data` pushed by the opcode byte `op` the shortest way.

@@ -437,7 +437,7 @@ impl Exec {
                 // Store this CODESEPARATOR position and update the scriptcode.
                 self.last_codeseparator_pos = Some(self.current_position as u32);
                 // as Core: the script code starts after the separator, not at it
-                self.script_code = &self.script[self.current_position + 1..];
+                self.script_code_start = self.current_position + 1;
             }
 
             OP_CHECKSIG | OP_CHECKSIGVERIFY => {
