@@ -17,7 +17,7 @@ cargo build --release  # one binary, the page embedded
 cargo test
 ```
 
-`BIND=127.0.0.1:5173,192.168.1.10:5173` listens on more addresses (a phone on the LAN). The JSON API: types in `server/src/model.rs`, status codes and limits in `server/src/api.rs`.
+Settings, by environment: `BIND` - addresses to listen on, comma separated (default `127.0.0.1:5173`); `METRICS_BIND` - address for Prometheus `/metrics` (off by default; keep it private).
 
 ## Notes
 
