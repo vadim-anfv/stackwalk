@@ -4,7 +4,7 @@ Step through Bitcoin Script with the stack drawn at every opcode. Write a policy
 
 ![stackwalk: a 2-of-3 policy compiled to miniscript and P2WSH, its spend paths, and the run step by step until OP_CHECKMULTISIG leaves 1](docs/run.gif)
 
-Live at [vadim.rs/stackwalk](https://vadim.rs/stackwalk) (soon).
+Live at [vadim.rs/stackwalk](https://vadim.rs/stackwalk/).
 
 **Experimental, for learning.** The interpreter is not Bitcoin Core's. It passes all 1217 legacy and segwit v0 vectors of Core's `script_tests.json` (v31.1); taproot is not covered. Don't rely on it for real funds. It never needs private keys: don't paste them.
 
