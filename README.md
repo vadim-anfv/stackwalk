@@ -19,7 +19,7 @@ cargo build --release  # one binary, the page embedded
 cargo test
 ```
 
-Settings, by environment: `BIND` - addresses to listen on, comma separated (default `127.0.0.1:5173`); `METRICS_BIND` - address for Prometheus `/metrics` (off by default; keep it private). For a public site put it behind a reverse proxy: the server has no header timeouts and no per-client rate limit. `deploy/` has the nginx, systemd and Prometheus configs of the live site.
+Settings, by environment: `BIND` - addresses to listen on, comma separated (default `127.0.0.1:5173`); `METRICS_BIND` - address for Prometheus `/metrics` (off by default; keep it private). For a public site put it behind a reverse proxy: the server has no header timeouts and no per-client rate limit. `deploy/` has example nginx and Prometheus configs.
 
 ## Notes
 
