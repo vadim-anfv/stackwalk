@@ -326,6 +326,7 @@ function renderStatic() {
   // shown only for the descriptor in the field: a draft there has no checksum yet
   $('desc-sum').hidden = !sc.checksum || Object.keys(state.drafts).length > 0;
   $('copy-desc').hidden = $('desc-sum').hidden;
+  $('copy-desc').title = sc.checksum ? `Copy ${sc.descriptor}#${sc.checksum}` : '';
   $('desc-sum').classList.toggle('test', !sc.importable);
   $('checksum').textContent = sc.checksum ? `#${sc.checksum}` : '';
   const testNames = sc.import_note?.startsWith('test names');
