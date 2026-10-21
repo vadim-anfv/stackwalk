@@ -10,10 +10,10 @@ const state = {
   scenario: 0,
   path: 0,
   step: 0,
-  mode: loadPref('mode', 'miniscript'),
-  source: 'policy', // which field the user typed into last: policy, miniscript or descriptor
+  source: 'policy', // which field the user typed into last: policy, miniscript, descriptor or script
   wrap: 'wsh', // output type policy / miniscript are built for (server/src/model.rs); an example sets it
   drafts: {}, // text that failed to compile, kept per field until fixed or an example is picked
+  derivedOpen: false, // a raw script folds the fields above it; the fold line opens them
   alt: loadPref('alt', 'off') === 'on',
   scriptView: loadPref('scriptView', 'grouped'), // desktop listing: 'grouped' by leaf fragment or 'ops', one per line
   testKeys: loadPref('testKeys', 'on') === 'on', // on by default: every example uses them, a first visit must run
@@ -192,7 +192,10 @@ function onSourceInput(e) {
   $('scenario').value = '';
   $('desc-sum').hidden = true; // the descriptor below is about to change: its checksum is stale
   $('copy-desc').hidden = true;
-  setStatus('busy', 'compiling…', e.target);
+  // the script field of another output holds its scriptPubKey: edited, it is a wsh script
+  const wrap = scenario().wrap;
+  const asWsh = e.target.dataset.kind === 'script' && wrap && wrap !== 'wsh';
+  setStatus('busy', asWsh ? `compiling as a wsh script (this was a ${wrap} output)…` : 'compiling…', e.target);
   compileTimer = setTimeout(() => compileField(e.target), COMPILE_DELAY);
 }
 
@@ -232,11 +235,18 @@ async function compileField(el) {
   state.scenario = null; // edited: no longer the example, the picker goes blank
   state.live = { ...res.sc, name: 'custom' };
   if (res.sc.wrap) state.wrap = res.sc.wrap; // a typed descriptor picks the output
+  if (kind === 'script') state.derivedOpen = false;
   state.path = 0;
   load();
-  // only a policy is compiled (a choice among miniscripts); the rest is checked and encoded
-  const DONE = { policy: 'compiled to miniscript', miniscript: 'valid miniscript', descriptor: 'valid descriptor', script: 'parsed' };
-  setStatus('ok', `✓ ${DONE[kind]}`, el);
+  setStatus('ok', `✓ ${doneText(kind, res.sc)}`, el);
+}
+
+// only a policy is compiled (a choice among miniscripts); the rest is checked and encoded.
+// No miniscript in the answer: a policy came down to one key (pkh, wpkh), a script is not one.
+function doneText(kind, sc) {
+  if (kind === 'policy') return sc.miniscript ? 'compiled to miniscript' : `one key: ${sc.descriptor}`;
+  if (kind === 'script') return sc.miniscript ? 'parsed: a miniscript, run as wsh; the fields above are filled' : 'parsed: not a miniscript, run as a wsh script';
+  return { miniscript: 'valid miniscript', descriptor: 'valid descriptor' }[kind];
 }
 
 // pick an example: the backend compiles and runs it
@@ -246,7 +256,7 @@ async function loadExample(i) {
   state.origin = null;
   state.path = 0;
   state.drafts = {};
-  state.source = ex.api.kind === 'script' ? 'policy' : ex.api.kind;
+  state.source = ex.api.kind;
   const id = ++reqSeq;
   setStatus('busy', 'compiling…');
   const res = await compile(ex.api);
@@ -265,11 +275,8 @@ function subtreeOps(node) {
 function renderStatic() {
   const sc = scenario();
 
-  // script only hides policy / miniscript, so name the group by what is shown
-  const groupLabel = (key, label) => (state.mode === 'script' && key === 'miniscript' ? 'compiled from miniscript' : label);
   $('scenario').innerHTML = Object.entries(groups)
     .map(([key, label]) => {
-      label = groupLabel(key, label);
       const opts = scenarios
         .map((s, i) => [s, i])
         .filter(([s]) => (s.group ?? 'miniscript') === key && !(s.alt && PHONE.matches))
@@ -287,28 +294,35 @@ function renderStatic() {
     .join('');
   $('paths').disabled = sc.paths.length < 2;
 
+  // a raw script: typed, and not a miniscript, so nothing above it is derived
+  const raw = state.source === 'script' && !sc.miniscript;
   for (const [kind, id] of Object.entries(INPUTS)) {
     const el = $(id);
     if (document.activeElement === el) continue; // don't fight the user's typing
     const draft = state.drafts[kind];
     el.value = draft ?? sourceText(sc, kind);
-    // a typed script runs as wsh: the scriptPubKey (+ redeemScript) of another output is not one
-    if (kind === 'script') {
-      el.readOnly = sc.wrap !== 'wsh';
-      el.title = el.readOnly ? `the scripts of a ${sc.wrap} output: a typed script runs as wsh. Edit it in descriptor mode` : '';
-    }
+    // a typed script runs as wsh: for another output this is its scriptPubKey (+ redeemScript)
+    if (kind === 'script') el.title = sc.wrap === 'wsh' ? '' : `the scripts of a ${sc.wrap} output: an edited script runs as wsh`;
     el.placeholder = el.value
       ? ''
-      : kind === 'miniscript' && ['pkh', 'wpkh'].includes(sc.wrap)
-        ? `${sc.wrap}() is a key template, no miniscript of its own`
-        : kind === 'policy' && ['miniscript', 'descriptor'].includes(state.source)
-          ? `not derived from the ${state.source}`
-          : `no ${kind} form`;
+      : raw && kind !== 'script'
+        ? `none: the script is not a miniscript`
+        : kind === 'miniscript' && ['pkh', 'wpkh'].includes(sc.wrap)
+          ? `${sc.wrap}() is a key template, no miniscript of its own`
+          : kind === 'policy' && ['miniscript', 'descriptor', 'script'].includes(state.source)
+            ? `not derived from the ${state.source}`
+            : `no ${kind} form`;
     el.classList.toggle('invalid', draft !== undefined);
+    // an empty layer stays a field (it can be typed into), drawn faint
+    el.closest('.field').classList.toggle('absent', !el.value);
   }
   for (const id of Object.values(INPUTS)) fitHeight($(id));
-  // the arrow only holds when the miniscript was compiled from the policy above it
-  $('flow').innerHTML = state.source === 'policy' && sc.policy ? '↓ compiles to' : '';
+  // the arrow only holds when a miniscript was compiled from the policy above it
+  $('flow').innerHTML = state.source === 'policy' && sc.policy && sc.miniscript ? '↓ compiles to' : '';
+  $('wrap').closest('.field').classList.toggle('absent', raw);
+  $('derived-line').hidden = !raw || state.derivedOpen;
+  $('derived').hidden = raw && !state.derivedOpen;
+  $('map-row').hidden = !sc.tree;
   // shown only for the descriptor in the field: a draft there has no checksum yet
   $('desc-sum').hidden = !sc.checksum || Object.keys(state.drafts).length > 0;
   $('copy-desc').hidden = $('desc-sum').hidden;
@@ -380,9 +394,6 @@ function renderStatic() {
   const depth = (key) => Math.max(...trace.steps.map((s) => s[key].length), 1) + 1;
   $('stack').parentElement.style.setProperty('--rows', Math.max(depth('stack'), 3));
   $('alt').parentElement.style.setProperty('--rows', Math.max(depth('alt'), 2));
-
-  document.body.dataset.mode = state.mode;
-  for (const b of $('mode').querySelectorAll('button')) b.classList.toggle('on', b.dataset.mode === state.mode);
 }
 
 // --- per-step parts ---
@@ -634,20 +645,6 @@ $('paths').onchange = (e) => {
   load();
 };
 
-function setMode(mode) {
-  // the mode only changes the source fields: show them if folded (phone)
-  if (mode !== state.mode) setSrcFold(false);
-  state.mode = mode;
-  savePref('mode', state.mode);
-  renderStatic();
-  render();
-}
-
-$('mode').onclick = (e) => {
-  const b = e.target.closest('[data-mode]');
-  if (b) setMode(b.dataset.mode);
-};
-
 // source fields are as tall as their content, so the whole text is visible
 function fitHeight(el) {
   if (!el.offsetParent) return; // hidden: ResizeObserver refits once shown
@@ -669,13 +666,31 @@ for (const id of Object.values(INPUTS)) {
       // unchanged: nothing to compile (a P2SH script recompiled as wsh was another output)
       const kind = el.dataset.kind;
       const changed = el.value !== sourceText(scenario(), kind) || state.drafts[kind] !== undefined;
-      if (changed && !el.readOnly) compileField(el);
+      if (changed) compileField(el);
       el.blur();
     } else if (e.key === 'Escape') {
       el.blur();
     }
   });
 }
+
+// the fold line over a raw script: open the fields, so a policy can be typed instead
+$('derived-line').onclick = () => {
+  state.derivedOpen = true;
+  renderStatic();
+  $('in-policy').focus();
+};
+
+// the way in for a script of one's own: an empty field, the example dropped
+$('own-script').onclick = () => {
+  const el = $('in-script');
+  el.value = '';
+  fitHeight(el);
+  state.scenario = null;
+  $('scenario').value = '';
+  el.focus();
+  setStatus('', 'ops by name (OP_DUP), numbers, <pk(A)>, <sha256(H)>, <0x…> for raw bytes', el);
+};
 
 // re-run the current example, staying on the same step where possible
 function reload() {
@@ -838,18 +853,16 @@ const KEYS = {
   ' ': next,
   k: () => setTestKeys(!state.testKeys),
   a: () => setAlt(!state.alt),
-  d: () => setMode('miniscript'), // the "descriptor" mode: policy -> miniscript -> descriptor
-  s: () => setMode('script'),
   e: editSource,
   n: nextPath,
 };
 
-// E: the cursor into the first source field of the mode that has text (policy is
-// empty for a miniscript or descriptor source), at the end of that text
+// E: the cursor into the field typed last (the first with text for an example),
+// at the end of that text
 function editSource() {
   setSrcFold(false);
-  const fields = state.mode === 'script' ? ['in-script'] : ['in-policy', 'in-miniscript', 'in-descriptor'];
-  const el = $(fields.find((f) => $(f).value.trim()) ?? fields[0]);
+  const fields = Object.values(INPUTS);
+  const el = $(state.origin ? INPUTS[state.source] : (fields.find((f) => $(f).value.trim()) ?? fields[0]));
   el.focus();
   el.setSelectionRange(el.value.length, el.value.length);
 }
@@ -876,7 +889,7 @@ function updateLink() {
   if (!state.live) return; // nothing compiled yet (or offline): keep the link that came in
   const at = state.scenario !== null ? { example: scenarios[state.scenario].name } : state.origin && { source: state.origin };
   if (!at) return;
-  const hash = writeLink({ ...at, path: state.path, step: state.step, mode: state.mode });
+  const hash = writeLink({ ...at, path: state.path, step: state.step });
   if (hash === location.hash) return;
   linked = hash;
   history.replaceState(null, '', hash);
@@ -884,7 +897,6 @@ function updateLink() {
 
 // open what a link names: compile it, then its path and step, bounded by the run
 async function openLink(link) {
-  setMode(link.mode);
   if (link.example !== undefined) await loadExample(link.example);
   else {
     if (link.source.wrap) state.wrap = link.source.wrap;

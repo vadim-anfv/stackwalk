@@ -213,8 +213,6 @@ main {
   padding: 10px 14px;
 }
 
-body[data-mode='script'] .ms-only,
-body:not([data-mode='script']) .script-only-field { display: none; }
 
 /* source panel */
 
@@ -263,7 +261,15 @@ textarea.src-input { display: block; resize: none; overflow: hidden; overflow-wr
 .copied.fail { color: var(--fail); }
 .src-input:focus { outline: none; border-color: var(--accent); }
 .src-input.invalid { border-color: var(--fail); }
-.src-input[readonly] { color: var(--muted); border-style: dashed; }
+/* a layer this source has none of (a raw script has no policy): faint, still typeable */
+.field.absent:not(:focus-within) > .k { color: var(--muted); }
+.field.absent:not(:focus-within) .src-input { border-style: dashed; background: transparent; }
+.field.absent:not(:focus-within) select { opacity: 0.5; }
+.script-field { margin-top: 6px; }
+.own-script { padding: 4px 0 0 calc(var(--lw) + 8px); }
+.derived-line { display: block; width: 100%; text-align: left; border: 1px dashed var(--line); background: transparent; color: var(--muted); font-size: 12px; padding: 6px 9px; border-radius: 8px; }
+.derived-line[hidden], #derived[hidden] { display: none; }
+.derived-line span { color: var(--text); margin-left: 6px; }
 .src-msg { font-size: 12px; margin: 4px 0; padding-left: calc(var(--lw) + 8px); }
 .src-msg:empty { display: none; }
 .src-sep { height: 1px; background: var(--line); margin: 10px 0; }

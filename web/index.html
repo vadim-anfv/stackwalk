@@ -26,10 +26,6 @@
   <header>
     <div class="brand">stack<span>walk</span></div>
     <div class="hdr">
-      <div class="seg" id="mode" role="group" aria-label="Mode">
-        <button data-mode="miniscript">descriptor <kbd>D</kbd></button>
-        <button data-mode="script">script only <kbd>S</kbd></button>
-      </div>
       <!-- phone: the toggles live here; desktop: app.js moves each into its [data-desk] slot -->
       <div class="toggles" id="toggles">
         <label class="toggle" title="Allow named test keys (A, B…) instead of real public keys: fixed keys derived from their names, so anyone can sign with them. Fine for learning, not for real funds."><input type="checkbox" id="keys-toggle"> test keys <kbd>K</kbd></label>
@@ -58,7 +54,6 @@
           <dt><kbd>Enter</kbd></dt><dd>in a source field: compile and leave it</dd>
           <dt><kbd>Shift</kbd>+<kbd>Enter</kbd></dt><dd>in a source field: new line</dd>
           <dt><kbd>Esc</kbd></dt><dd>leave the source field</dd>
-          <dt><kbd>D</kbd> <kbd>S</kbd></dt><dd>descriptor / script mode</dd>
           <dt><kbd>K</kbd></dt><dd>test keys on / off</dd>
           <dt><kbd>A</kbd></dt><dd>alt stack on / off</dd>
           <dt><kbd>?</kbd></dt><dd>this list</dd>
@@ -107,17 +102,20 @@
         <div class="src-body">
         <!-- desktop: test keys, under the fields' labels; it decides how they are read -->
         <div class="toggle-slot keys-slot" data-desk="keys-toggle"></div>
-        <div class="field ms-only">
+        <!-- a raw script (typed, not a miniscript) has none of these: they fold into one line -->
+        <button id="derived-line" class="derived-line" hidden>policy, miniscript, descriptor: none for this script <span>▸ show</span></button>
+        <div id="derived">
+        <div class="field">
           <label for="in-policy" class="k">policy</label>
           <textarea id="in-policy" class="src-input" data-kind="policy" rows="1" spellcheck="false" autocomplete="off" autocorrect="off" autocapitalize="off" placeholder="and(pk(A),pk(B))"></textarea>
         </div>
-        <div id="flow" class="flow ms-only"></div>
-        <div class="field ms-only">
+        <div id="flow" class="flow"></div>
+        <div class="field">
           <label for="in-miniscript" class="k">miniscript</label>
           <textarea id="in-miniscript" class="src-input" data-kind="miniscript" rows="1" spellcheck="false" autocomplete="off" autocorrect="off" autocapitalize="off" placeholder="and_v(v:pk(A),pk(B))"></textarea>
         </div>
         <!-- what the policy / miniscript is wrapped in; changing it recompiles -->
-        <div class="field ms-only wrap-field">
+        <div class="field wrap-field">
           <label for="wrap" class="k">output</label>
           <select id="wrap" class="wrap">
             <option value="bare">bare (P2PK, P2MS)</option>
@@ -128,9 +126,9 @@
             <option value="tr" disabled>tr (P2TR), not yet</option>
           </select>
         </div>
-        <div id="wrap-warn" class="wrap-warn ms-only" hidden>⚠ not BIP-379: miniscript is specified for wsh and tr only</div>
+        <div id="wrap-warn" class="wrap-warn" hidden>⚠ not BIP-379: miniscript is specified for wsh and tr only</div>
         <!-- the whole output: editable too; it names its own output type -->
-        <div class="field ms-only desc-field">
+        <div class="field desc-field">
           <label for="in-descriptor" class="k">descriptor</label>
           <div class="desc-box">
             <textarea id="in-descriptor" class="src-input" data-kind="descriptor" rows="1" spellcheck="false" autocomplete="off" autocorrect="off" autocapitalize="off" placeholder="wsh(multi(2,A,B,C))"></textarea>
@@ -138,25 +136,28 @@
           </div>
         </div>
         <!-- BIP-380 checksum: outside the field, so editing the body never breaks it; copy takes both -->
-        <div id="desc-sum" class="desc-sum ms-only" hidden>
+        <div id="desc-sum" class="desc-sum" hidden>
           <span class="muted">checksum</span><code id="checksum"></code>
           <span id="sum-note" class="sum-note"></span>
           <!-- after copy: what went to the clipboard, for a moment, in place of the line -->
           <span id="copied" class="copied"></span>
         </div>
-        <div class="field script-only-field">
-          <label for="in-script" class="k">script</label>
-          <textarea id="in-script" class="src-input" data-kind="script" rows="1" spellcheck="false" autocomplete="off" autocorrect="off" autocapitalize="off" placeholder="OP_DUP OP_HASH160 …"></textarea>
         </div>
+        <!-- any script can be typed here: a miniscript fills the fields above, any other runs as is -->
+        <div class="field script-field">
+          <label for="in-script" class="k">script</label>
+          <textarea id="in-script" class="src-input" data-kind="script" rows="1" spellcheck="false" autocomplete="off" autocorrect="off" autocapitalize="off" placeholder="OP_DUP OP_HASH160 &lt;hash160(A)&gt; OP_EQUALVERIFY OP_CHECKSIG"></textarea>
+        </div>
+        <div class="own-script"><button id="own-script" class="link-btn">paste your own script</button></div>
         <!-- compile status: app.js moves it under the field being edited -->
         <div id="src-msg" class="src-msg"></div>
         <!-- above: what you type; below: what it builds -->
         <div class="src-sep"></div>
-        <div class="row ms-only"><span class="k">opcode map</span><code id="miniscript" title="Hover or tap a fragment to see its opcodes"></code></div>
+        <div id="map-row" class="row"><span class="k">opcode map</span><code id="miniscript" title="Hover or tap a fragment to see its opcodes"></code></div>
         <!-- phone only: opcodes of the tapped fragment (the script list is off screen) -->
         <div id="frag-ops" class="frag-ops" hidden></div>
         <!-- real keys of the input: built as test keys of these names (we can't sign for them) -->
-        <div id="keys-row" class="row ms-only" hidden><span class="k">swapped</span><div><code id="keys"></code><div class="keys-note">real keys and hashes, run as test keys and test hashes of these names: script bytes and signatures are not the real ones, and sizes are for compressed keys</div></div></div>
+        <div id="keys-row" class="row" hidden><span class="k">swapped</span><div><code id="keys"></code><div class="keys-note">real keys and hashes, run as test keys and test hashes of these names: script bytes and signatures are not the real ones, and sizes are for compressed keys</div></div></div>
         <div class="row"><span class="k">scriptPubKey</span><code id="spk"></code></div>
         <div id="about" class="about"></div>
         </div>
